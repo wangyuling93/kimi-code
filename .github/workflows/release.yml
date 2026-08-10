@@ -62,11 +62,10 @@ jobs:
           title: "ci: release packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # First publish uses a token (npm requires the package to exist before
-          # a trusted publisher can be added). After configuring trusted
-          # publishing on npm, delete the NPM_TOKEN secret and set
-          # publishConfig.provenance back to true in apps/kimi-code/package.json.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Publishing uses npm OIDC trusted publishing (configured on the
+          # package page); provenance is generated automatically. No token is
+          # needed — NPM_TOKEN was only used to bootstrap the first publish.
+          # id-token: write is granted above.
 
       - name: Resolve Kimi Code native release
         if: steps.changesets.outputs.published == 'true'
