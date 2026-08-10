@@ -23,7 +23,7 @@ if (!inputDir || !tag) {
 }
 
 // Tag 格式 `@vyl/kimi-code@x.y.z` 或 `vx.y.z` 或 `x.y.z`，都归一化到 x.y.z
-const version = tag.replace(/^@moonshot-ai\/kimi-code@/, '').replace(/^v/, '');
+const version = tag.replace(/^@vyl\/kimi-code@/, '').replace(/^v/, '');
 
 const entries = await readdir(inputDir);
 const sumFiles = entries.filter((f) => /^kimi-code-[a-z0-9-]+\.zip\.sha256$/.test(f));
