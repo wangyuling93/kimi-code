@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,6 +11,7 @@ import { buildAcpSkillSlashCommands } from '../src/slash';
 import { createTestClient, type TestClient } from './_helpers/acpClient';
 import { writeFakeModelConfig } from './_helpers/fakeModelConfig';
 import { createScriptedProvider, type ScriptedProvider } from './_helpers/scriptedProvider';
+import { rmrf } from './_helpers/rmrf';
 
 interface AvailableCommand {
   readonly name: string;
@@ -84,7 +85,7 @@ describe('acp-server skills / available commands', () => {
       client = undefined;
     }
     if (homeDir !== undefined) {
-      await rm(homeDir, { recursive: true, force: true });
+      await rmrf(homeDir);
       homeDir = undefined;
     }
   });

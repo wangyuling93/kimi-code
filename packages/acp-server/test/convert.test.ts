@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -12,6 +12,7 @@ import {
   compressPromptImageParts,
 } from '../src/convert';
 import { solidPng, solidPngBase64 } from './_helpers/png';
+import { rmrf } from './_helpers/rmrf';
 
 describe('acpMcpServersToConfigRecord', () => {
   it('returns undefined for an absent or empty list', () => {
@@ -93,7 +94,7 @@ describe('compressPromptImageParts', () => {
   const trash: string[] = [];
 
   afterEach(async () => {
-    await Promise.all(trash.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+    await Promise.all(trash.splice(0).map((dir) => rmrf(dir)));
   });
 
   async function tempOriginalsDir(): Promise<string> {

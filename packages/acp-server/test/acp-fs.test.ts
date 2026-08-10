@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { AcpHostFileSystem } from '../src/acp-fs/acpFsService';
 import type { IAcpConnection } from '../src/acp-fs/acpConnection';
+import { rmrf } from './_helpers/rmrf';
 
 interface FakeClient {
   readTextFile: (params: { sessionId: string; path: string }) => Promise<{ content: string }>;
@@ -51,7 +52,7 @@ describe('AcpHostFileSystem', () => {
 
   afterEach(async () => {
     if (tempDir !== undefined) {
-      await rm(tempDir, { recursive: true, force: true });
+      await rmrf(tempDir);
       tempDir = undefined;
     }
   });
