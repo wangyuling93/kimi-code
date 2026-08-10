@@ -1,5 +1,11 @@
 # @moonshot-ai/kimi-code
 
+## 0.35.0
+
+### Minor Changes
+
+- [`02fb248`](https://github.com/wangyuling93/kimi-code/commit/02fb24855652330517b12d5dc938f100c9b3ae4b) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Add keyboard text selection to the prompt input: hold Shift and move with the arrow keys to select text, then press Delete or Backspace to remove the whole selection, or type to replace it.
+
 ## 0.34.1
 
 ### Patch Changes

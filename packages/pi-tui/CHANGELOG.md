@@ -1,5 +1,11 @@
 # @moonshot-ai/pi-tui
 
+## 0.81.0
+
+### Minor Changes
+
+- [`02fb248`](https://github.com/wangyuling93/kimi-code/commit/02fb24855652330517b12d5dc938f100c9b3ae4b) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Add shift+arrow text selection to the editor: the selected span renders with inverse video, Backspace/Delete remove the whole selection, and typing replaces it.
+
 ## 0.80.8
 
 ### Patch Changes
