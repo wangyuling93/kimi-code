@@ -228,10 +228,6 @@ interface LayoutLine {
 	text: string;
 	hasCursor: boolean;
 	cursorPos?: number;
-	/** Index of the logical line this visual line renders from. */
-	sourceLine: number;
-	/** Column in the logical line where this visual line's text starts. */
-	sourceStart: number;
 }
 
 export interface EditorTheme {
@@ -326,10 +322,6 @@ export class Editor implements Component, Focusable {
 	// Kill ring for Emacs-style kill/yank operations
 	private killRing = new KillRing();
 	private lastAction: "kill" | "yank" | "type-word" | null = null;
-
-	// Shift+arrow text selection: the non-moving end of the selection. The
-	// moving end is the cursor, so the selected range spans [anchor, cursor).
-	private selectionAnchor: { line: number; col: number } | null = null;
 
 	// Character jump mode
 	private jumpMode: "forward" | "backward" | null = null;
@@ -618,32 +610,36 @@ export class Editor implements Component, Focusable {
 		const emitCursorMarker = this.focused;
 
 		for (const layoutLine of visibleLines) {
-			const plainText = layoutLine.text;
-			let lineVisibleWidth = visibleWidth(plainText);
+			let displayText = layoutLine.text;
+			let lineVisibleWidth = visibleWidth(layoutLine.text);
 			let cursorInPadding = false;
 
-			// Hardware cursor marker (zero-width, emitted before the fake cursor
-			// block for IME positioning) — only when focused.
-			const marker = emitCursorMarker ? CURSOR_MARKER : "";
+			// Add cursor if this line has it
+			if (layoutLine.hasCursor && layoutLine.cursorPos !== undefined) {
+				const before = displayText.slice(0, layoutLine.cursorPos);
+				const after = displayText.slice(layoutLine.cursorPos);
 
-			// Paint the selection highlight and the cursor block together so the
-			// cursor stays visible at a selection edge.
-			const sel = this.selectionAnchor === null ? null : this.selectionOnLine(layoutLine);
-			const cursorPos = layoutLine.hasCursor ? layoutLine.cursorPos : undefined;
-			const painted = this.paintSelectionAndCursor(
-				plainText,
-				sel?.start ?? -1,
-				sel?.end ?? -1,
-				cursorPos,
-				marker,
-			);
-			const displayText = painted.text;
-			// An end-of-line cursor block adds one visible column.
-			if (painted.cursorAtEnd) {
-				lineVisibleWidth += 1;
-				// If the cursor overflows the content width into the padding, flag it.
-				if (lineVisibleWidth > contentWidth && paddingX > 0) {
-					cursorInPadding = true;
+				// Hardware cursor marker (zero-width, emitted before fake cursor for IME positioning)
+				const marker = emitCursorMarker ? CURSOR_MARKER : "";
+
+				if (after.length > 0) {
+					// Cursor is on a character (grapheme) - replace it with highlighted version
+					// Get the first grapheme from 'after'
+					const afterGraphemes = [...this.segment(after, "grapheme")];
+					const firstGrapheme = afterGraphemes[0]?.segment || "";
+					const restAfter = after.slice(firstGrapheme.length);
+					const cursor = `\x1b[7m${firstGrapheme}\x1b[0m`;
+					displayText = before + marker + cursor + restAfter;
+					// lineVisibleWidth stays the same - we're replacing, not adding
+				} else {
+					// Cursor is at the end - add highlighted space
+					const cursor = "\x1b[7m \x1b[0m";
+					displayText = before + marker + cursor;
+					lineVisibleWidth = lineVisibleWidth + 1;
+					// If cursor overflows content width into the padding, flag it
+					if (lineVisibleWidth > contentWidth && paddingX > 0) {
+						cursorInPadding = true;
+					}
 				}
 			}
 
@@ -854,22 +850,18 @@ export class Editor implements Component, Focusable {
 
 		// Cursor movement actions
 		if (kb.matches(data, "tui.editor.cursorLineStart")) {
-			this.clearSelection();
 			this.moveToLineStart();
 			return;
 		}
 		if (kb.matches(data, "tui.editor.cursorLineEnd")) {
-			this.clearSelection();
 			this.moveToLineEnd();
 			return;
 		}
 		if (kb.matches(data, "tui.editor.cursorWordLeft")) {
-			this.clearSelection();
 			this.moveWordBackwards();
 			return;
 		}
 		if (kb.matches(data, "tui.editor.cursorWordRight")) {
-			this.clearSelection();
 			this.moveWordForwards();
 			return;
 		}
@@ -915,27 +907,8 @@ export class Editor implements Component, Focusable {
 			return;
 		}
 
-		// Shift+arrow: start or extend a text selection. Shift variants never
-		// touch history or clear the selection; plain arrows clear it below.
-		if (
-			matchesKey(data, "shift+left") ||
-			matchesKey(data, "shift+right") ||
-			matchesKey(data, "shift+up") ||
-			matchesKey(data, "shift+down")
-		) {
-			if (this.selectionAnchor === null) {
-				this.selectionAnchor = { line: this.state.cursorLine, col: this.state.cursorCol };
-			}
-			if (matchesKey(data, "shift+left")) this.moveCursor(0, -1);
-			else if (matchesKey(data, "shift+right")) this.moveCursor(0, 1);
-			else if (matchesKey(data, "shift+up")) this.moveCursor(-1, 0);
-			else this.moveCursor(1, 0);
-			return;
-		}
-
 		// Arrow key navigation (with history support)
 		if (kb.matches(data, "tui.editor.cursorUp")) {
-			this.clearSelection();
 			if (
 				this.isOnFirstVisualLine() &&
 				(this.isEditorEmpty() || this.historyIndex > -1 || this.state.cursorCol === 0)
@@ -950,7 +923,6 @@ export class Editor implements Component, Focusable {
 			return;
 		}
 		if (kb.matches(data, "tui.editor.cursorDown")) {
-			this.clearSelection();
 			if (this.historyIndex > -1 && this.isOnLastVisualLine()) {
 				this.navigateHistory(1);
 			} else if (this.isOnLastVisualLine()) {
@@ -962,24 +934,20 @@ export class Editor implements Component, Focusable {
 			return;
 		}
 		if (kb.matches(data, "tui.editor.cursorRight")) {
-			this.clearSelection();
 			this.moveCursor(0, 1);
 			return;
 		}
 		if (kb.matches(data, "tui.editor.cursorLeft")) {
-			this.clearSelection();
 			this.moveCursor(0, -1);
 			return;
 		}
 
 		// Page up/down - scroll by page and move cursor
 		if (kb.matches(data, "tui.editor.pageUp")) {
-			this.clearSelection();
 			this.pageScroll(-1);
 			return;
 		}
 		if (kb.matches(data, "tui.editor.pageDown")) {
-			this.clearSelection();
 			this.pageScroll(1);
 			return;
 		}
@@ -1027,8 +995,6 @@ export class Editor implements Component, Focusable {
 				text: "",
 				hasCursor: true,
 				cursorPos: 0,
-				sourceLine: 0,
-				sourceStart: 0,
 			});
 			return layoutLines;
 		}
@@ -1046,15 +1012,11 @@ export class Editor implements Component, Focusable {
 						text: line,
 						hasCursor: true,
 						cursorPos: this.state.cursorCol,
-						sourceLine: i,
-						sourceStart: 0,
 					});
 				} else {
 					layoutLines.push({
 						text: line,
 						hasCursor: false,
-						sourceLine: i,
-						sourceStart: 0,
 					});
 				}
 			} else {
@@ -1098,15 +1060,11 @@ export class Editor implements Component, Focusable {
 							text: chunk.text,
 							hasCursor: true,
 							cursorPos: adjustedCursorPos,
-							sourceLine: i,
-							sourceStart: chunk.startIndex,
 						});
 					} else {
 						layoutLines.push({
 							text: chunk.text,
 							hasCursor: false,
-							sourceLine: i,
-							sourceStart: chunk.startIndex,
 						});
 					}
 				}
@@ -1231,13 +1189,6 @@ export class Editor implements Component, Focusable {
 	// All the editor methods from before...
 	private insertCharacter(char: string, skipUndoCoalescing?: boolean): void {
 		this.exitHistoryBrowsing();
-
-		// Typing over an active selection replaces it. No undo snapshot here:
-		// the normal insert path below snapshots, so the whole replace is a
-		// single undo unit.
-		if (this.selectionActive()) {
-			this.removeSelectionText();
-		}
 
 		// Undo coalescing (fish-style):
 		// - Consecutive word chars coalesce into one undo unit
@@ -1416,146 +1367,9 @@ export class Editor implements Component, Focusable {
 		if (this.onSubmit) this.onSubmit(result);
 	}
 
-	/**
-	 * Normalized [start, end) selection range in logical (line, col) space,
-	 * or null when there is no active selection.
-	 */
-	private selectionRange(): { startLine: number; startCol: number; endLine: number; endCol: number } | null {
-		if (this.selectionAnchor === null) return null;
-		const a = this.selectionAnchor;
-		const b = { line: this.state.cursorLine, col: this.state.cursorCol };
-		const start =
-			a.line < b.line || (a.line === b.line && a.col <= b.col) ? a : b;
-		const end = start === a ? b : a;
-		return { startLine: start.line, startCol: start.col, endLine: end.line, endCol: end.col };
-	}
-
-	/** True when a non-empty selection spans between the anchor and the cursor. */
-	private selectionActive(): boolean {
-		const range = this.selectionRange();
-		return range !== null && (range.startLine !== range.endLine || range.startCol !== range.endCol);
-	}
-
-	private clearSelection(): void {
-		this.selectionAnchor = null;
-	}
-
-	/**
-	 * Delete the active selection, leaving the cursor at its start. Returns
-	 * true when a selection was removed (callers skip their single-char path).
-	 * Does not take an undo snapshot — the caller decides when to snapshot.
-	 */
-	private removeSelectionText(): boolean {
-		const range = this.selectionRange();
-		if (range === null || (range.startLine === range.endLine && range.startCol === range.endCol)) {
-			return false;
-		}
-		const lines = this.state.lines;
-		lines[range.startLine] =
-			(lines[range.startLine] ?? "").slice(0, range.startCol) +
-			(lines[range.endLine] ?? "").slice(range.endCol);
-		lines.splice(range.startLine + 1, range.endLine - range.startLine);
-		this.state.cursorLine = range.startLine;
-		this.setCursorCol(range.startCol);
-		this.clearSelection();
-		this.lastAction = null;
-		return true;
-	}
-
-	/**
-	 * The selection's char offsets within a layout line, or null when this
-	 * line does not overlap the selection.
-	 */
-	private selectionOnLine(layoutLine: LayoutLine): { start: number; end: number } | null {
-		const range = this.selectionRange();
-		if (range === null) return null;
-		if (layoutLine.sourceLine < range.startLine || layoutLine.sourceLine > range.endLine) return null;
-		const segStart = layoutLine.sourceStart;
-		const segEnd = segStart + layoutLine.text.length;
-		const selStart = Math.max(range.startLine === layoutLine.sourceLine ? range.startCol : 0, segStart);
-		const selEnd = Math.min(range.endLine === layoutLine.sourceLine ? range.endCol : segEnd, segEnd);
-		if (selStart >= selEnd) return null;
-		return { start: selStart - segStart, end: selEnd - segStart };
-	}
-
-	/**
-	 * Paint the selection highlight and the fake cursor block onto a plain
-	 * layout-line segment. Selection is inverse video; the cursor block is
-	 * painted on top so a cursor sitting at a selection edge stays visible.
-	 *
-	 * `selStart`/`selEnd` are char offsets into `text` (-1/-1 when this line
-	 * has no selection). `cursorPos` is the cursor's char offset in `text`
-	 * (undefined when the cursor is not on this line). Returns the painted
-	 * segment plus whether an end-of-line cursor block was appended (which
-	 * adds one visible column).
-	 */
-	private paintSelectionAndCursor(
-		text: string,
-		selStart: number,
-		selEnd: number,
-		cursorPos: number | undefined,
-		cursorMarker: string,
-	): { text: string; cursorAtEnd: boolean } {
-		const hasSel = selStart >= 0 && selEnd > selStart;
-
-		// Cursor grapheme span in char space; empty when the cursor sits at
-		// the end of the line (the block is appended instead of replacing a
-		// character).
-		let cgStart = -1;
-		let cgEnd = -1;
-		if (cursorPos !== undefined && cursorPos < text.length) {
-			const graphemes = [...this.segment(text.slice(cursorPos), "grapheme")];
-			const first = graphemes[0]?.segment ?? text[cursorPos] ?? "";
-			cgStart = cursorPos;
-			cgEnd = cursorPos + first.length;
-		}
-		const cursorAtEnd = cursorPos !== undefined && cgStart === -1;
-
-		if (!hasSel && !cursorAtEnd) {
-			return { text, cursorAtEnd: false };
-		}
-
-		// Split points (char offsets) covering [0, text.length); each span is
-		// painted inverse when it falls inside the selection or the cursor block.
-		const points = [0, text.length];
-		if (hasSel) points.push(selStart, selEnd);
-		if (cgStart >= 0) points.push(cgStart, cgEnd);
-		points.sort((a, b) => a - b);
-
-		let out = "";
-		for (let i = 0; i < points.length - 1; i++) {
-			const from = points[i]!;
-			const to = points[i + 1]!;
-			if (to <= from) continue;
-			const inverse =
-				(hasSel && from >= selStart && to <= selEnd) ||
-				(cgStart >= 0 && from >= cgStart && to <= cgEnd);
-			const chunk = text.slice(from, to);
-			if (inverse) {
-				out += cursorMarker + `\x1b[7m${chunk}\x1b[0m`;
-			} else {
-				out += chunk;
-			}
-		}
-
-		if (cursorAtEnd) {
-			out += cursorMarker + "\x1b[7m \x1b[0m";
-		}
-
-		return { text: out, cursorAtEnd };
-	}
-
 	private handleBackspace(): void {
 		this.exitHistoryBrowsing();
 		this.lastAction = null;
-
-		// Backspace with an active selection deletes the whole selection.
-		if (this.selectionActive()) {
-			this.pushUndoSnapshot();
-			this.removeSelectionText();
-			this.finishDeletion();
-			return;
-		}
 
 		if (this.state.cursorCol > 0) {
 			this.pushUndoSnapshot();
@@ -1588,16 +1402,11 @@ export class Editor implements Component, Focusable {
 			this.setCursorCol(previousLine.length);
 		}
 
-		this.finishDeletion();
-	}
-
-	/** Shared post-deletion work: notify onChange and refresh autocomplete. */
-	private finishDeletion(): void {
 		if (this.onChange) {
 			this.onChange(this.getText());
 		}
 
-		// Update or re-trigger autocomplete after deletion
+		// Update or re-trigger autocomplete after backspace
 		if (this.autocompleteState) {
 			this.updateAutocomplete();
 		} else {
@@ -1933,14 +1742,6 @@ export class Editor implements Component, Focusable {
 		this.exitHistoryBrowsing();
 		this.lastAction = null;
 
-		// Delete with an active selection deletes the whole selection.
-		if (this.selectionActive()) {
-			this.pushUndoSnapshot();
-			this.removeSelectionText();
-			this.finishDeletion();
-			return;
-		}
-
 		const currentLine = this.state.lines[this.state.cursorLine] || "";
 
 		if (this.state.cursorCol < currentLine.length) {
@@ -1966,7 +1767,25 @@ export class Editor implements Component, Focusable {
 			this.state.lines.splice(this.state.cursorLine + 1, 1);
 		}
 
-		this.finishDeletion();
+		if (this.onChange) {
+			this.onChange(this.getText());
+		}
+
+		// Update or re-trigger autocomplete after forward delete
+		if (this.autocompleteState) {
+			this.updateAutocomplete();
+		} else {
+			const currentLine = this.state.lines[this.state.cursorLine] || "";
+			const textBeforeCursor = currentLine.slice(0, this.state.cursorCol);
+			// Slash command context
+			if (this.isInSlashCommandContext(textBeforeCursor)) {
+				this.tryTriggerAutocomplete();
+			}
+			// Symbol-based completion context like @, #, or provider triggers
+			else if (this.autocompleteTriggerPattern.test(textBeforeCursor)) {
+				this.tryTriggerAutocomplete();
+			}
+		}
 	}
 
 	/**
