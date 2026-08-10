@@ -106,7 +106,7 @@
         "@moonshot-ai/kimi-telemetry"
         "@moonshot-ai/transcript"
         "@moonshot-ai/tree-sitter-bash"
-        "@moonshot-ai/kimi-code"
+        "@vyl/kimi-code"
         "kimi-code"
         "@moonshot-ai/kimi-inspect"
         "@moonshot-ai/vis"
@@ -205,7 +205,7 @@
               # code-app repo) — verify it is in place before producing the
               # native executable.
               node apps/kimi-code/scripts/check-web-assets.mjs
-              pnpm --filter=@moonshot-ai/kimi-code run build:native:sea
+              pnpm --filter=@vyl/kimi-code run build:native:sea
               runHook postBuild
             '';
 
