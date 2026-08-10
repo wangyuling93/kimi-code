@@ -4450,3 +4450,99 @@ describe("Editor narrow width rendering", () => {
 		assert.doesNotThrow(() => editor.render(-1));
 	});
 });
+
+describe("Editor text selection (shift+arrows)", () => {
+	const SHIFT_RIGHT = "\x1b[1;2C";
+	const SHIFT_LEFT = "\x1b[1;2D";
+	const SHIFT_DOWN = "\x1b[1;2B";
+	const LINE_START = "\x01"; // ctrl+a
+	const DELETE = "\x1b[3~";
+
+	it("selects forward with shift+right and Delete removes the whole selection", () => {
+		const editor = new Editor(createTestTUI(), defaultEditorTheme);
+		editor.setText("hello world");
+		editor.handleInput(LINE_START); // cursor to start
+
+		for (let i = 0; i < 5; i++) editor.handleInput(SHIFT_RIGHT); // select "hello"
+		editor.handleInput(DELETE);
+
+		assert.strictEqual(editor.getText(), " world");
+	});
+
+	it("selects backward with shift+left and Backspace removes the whole selection", () => {
+		const editor = new Editor(createTestTUI(), defaultEditorTheme);
+		editor.setText("hello world");
+
+		for (let i = 0; i < 5; i++) editor.handleInput(SHIFT_LEFT); // select "world" (cursor starts at end)
+		editor.handleInput("\x7f"); // Backspace
+
+		assert.strictEqual(editor.getText(), "hello ");
+	});
+
+	it("typing replaces the selection", () => {
+		const editor = new Editor(createTestTUI(), defaultEditorTheme);
+		editor.setText("hello world");
+		editor.handleInput(LINE_START);
+
+		for (let i = 0; i < 5; i++) editor.handleInput(SHIFT_RIGHT); // select "hello"
+		editor.handleInput("x");
+
+		assert.strictEqual(editor.getText(), "x world");
+	});
+
+	it("renders the selected span with inverse video", () => {
+		const editor = new Editor(createTestTUI(), defaultEditorTheme);
+		editor.setText("hello");
+		editor.handleInput(LINE_START);
+		editor.handleInput(SHIFT_RIGHT);
+		editor.handleInput(SHIFT_RIGHT);
+
+		const rendered = editor.render(30).join("\n");
+		assert.ok(rendered.includes("\x1b[7mhe\x1b[0m"), `expected inverse selection, got: ${rendered}`);
+	});
+
+	it("clears the selection on a plain arrow press", () => {
+		const editor = new Editor(createTestTUI(), defaultEditorTheme);
+		editor.setText("hello");
+		editor.handleInput(LINE_START);
+
+		for (let i = 0; i < 3; i++) editor.handleInput(SHIFT_RIGHT); // select "hel"
+		editor.handleInput("\x1b[D"); // plain left - clears selection
+		editor.handleInput(DELETE); // deletes a single char at the cursor
+
+		assert.strictEqual(editor.getText(), "helo");
+	});
+
+	it("deletes across lines when the selection spans multiple logical lines", () => {
+		const editor = new Editor(createTestTUI(), defaultEditorTheme);
+		editor.setText("ab\ncd");
+		editor.handleInput("\x1b[A"); // up to the first line
+		editor.handleInput(LINE_START); // cursor to (0,0)
+
+		editor.handleInput(SHIFT_DOWN); // select from (0,0) through line 1
+
+		editor.handleInput(DELETE);
+
+		assert.strictEqual(editor.getText(), "cd");
+	});
+
+	it("keeps single-char Delete behavior for a zero-length selection", () => {
+		const editor = new Editor(createTestTUI(), defaultEditorTheme);
+		editor.setText("hello");
+
+		for (let i = 0; i < 10; i++) editor.handleInput(SHIFT_RIGHT); // cursor already at end
+		editor.handleInput(DELETE);
+
+		assert.strictEqual(editor.getText(), "hello");
+	});
+
+	it("shift+up does not trigger history navigation", () => {
+		const editor = new Editor(createTestTUI(), defaultEditorTheme);
+		editor.addToHistory("old prompt");
+		editor.setText("draft");
+
+		editor.handleInput("\x1b[1;2A"); // shift+up
+
+		assert.strictEqual(editor.getText(), "draft");
+	});
+});
