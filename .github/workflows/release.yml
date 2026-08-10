@@ -60,6 +60,10 @@ jobs:
           version: pnpm run version:release
           commit: "ci: release packages"
           title: "ci: release packages"
+          # Auto-merge the version PR once required checks pass. Needs the
+          # repo setting "Allow auto-merge" (Settings → General → Pull
+          # requests) and a branch protection rule requiring status checks.
+          enableAutoMerge: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Publishing uses npm OIDC trusted publishing (configured on the
