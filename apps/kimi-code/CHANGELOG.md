@@ -1,5 +1,17 @@
 # @moonshot-ai/kimi-code
 
+## 0.35.0
+
+### Minor Changes
+
+- [`ba21dd6`](https://github.com/wangyuling93/kimi-code/commit/ba21dd62a9516ac1a680b62e8d31ff41da5bd4b4) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Copy mouse-selected text to the clipboard automatically and show a confirmation toast. Drag to select text in the message box to copy it.
+
+- [`40c4f49`](https://github.com/wangyuling93/kimi-code/commit/40c4f495022e959122785c63686ce2400cfdf4ca) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Support mouse input in the message box: click to place the cursor and drag to select text. Deleting or typing replaces the selected text.
+
+### Patch Changes
+
+- [`fa0660f`](https://github.com/wangyuling93/kimi-code/commit/fa0660f27262520c3c39aade5de6f1faec6b100f) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Show the message box caret as a theme-colored blinking block cursor, hidden while text is selected.
+
 ## 0.34.1
 
 ### Patch Changes
