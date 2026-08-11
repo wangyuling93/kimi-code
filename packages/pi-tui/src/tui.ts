@@ -1369,7 +1369,11 @@ export class TUI extends Container {
 		// Pad to at least terminal height so overlays have screen-relative positions.
 		// Excludes maxLinesRendered: the historical high-water mark caused self-reinforcing
 		// inflation that pushed content into scrollback on terminal widen.
-		const workingHeight = Math.max(result.length, termHeight, minLinesNeeded);
+		// When the content plus overlay needs are below the terminal height, pad only
+		// to the overlay's needs (minLinesNeeded) instead of the full terminal height —
+		// inflating the buffer to termHeight for a small corner toast made every
+		// show/hide rewrite the whole screen and briefly flip the scroll indicator.
+		const workingHeight = Math.max(result.length, Math.min(termHeight, minLinesNeeded));
 
 		// Extend result with empty lines if content is too short for overlay placement or working area
 		while (result.length < workingHeight) {
@@ -1477,29 +1481,45 @@ export class TUI extends Container {
 	): string {
 		if (isImageLine(baseLine)) return baseLine;
 
-		// Single pass through baseLine extracts both before and after segments
-		const afterStart = startCol + overlayWidth;
-		const base = extractSegments(baseLine, startCol, afterStart, totalWidth - afterStart, true);
+		// Never cover the last visible column of the base line when the line is
+		// rendered narrower than the terminal width (components use logical
+		// right padding), so the base line's right edge (e.g. a box corner)
+		// stays intact. Full-width lines keep the previous behavior.
+		const lineVisibleWidth = visibleWidth(baseLine);
+		const rightAlignOverlay = lineVisibleWidth > 0 && lineVisibleWidth < totalWidth;
+		const effectiveAfterStart = rightAlignOverlay
+			? Math.min(startCol + overlayWidth, Math.max(startCol, lineVisibleWidth - 1))
+			: startCol + overlayWidth;
+		const effectiveOverlayWidth = effectiveAfterStart - startCol;
+		const base = extractSegments(baseLine, startCol, effectiveAfterStart, totalWidth - effectiveAfterStart, true);
 
 		// Extract overlay with width tracking (strict=true to exclude wide chars at boundary)
-		const overlay = sliceWithWidth(overlayLine, 0, overlayWidth, true);
+		const overlay = sliceWithWidth(overlayLine, 0, effectiveOverlayWidth, true);
 
 		// Pad segments to target widths
 		const beforePad = Math.max(0, startCol - base.beforeWidth);
-		const overlayPad = Math.max(0, overlayWidth - overlay.width);
+		const overlayPad = Math.max(0, effectiveOverlayWidth - overlay.width);
 		const actualBeforeWidth = Math.max(startCol, base.beforeWidth);
-		const actualOverlayWidth = Math.max(overlayWidth, overlay.width);
+		const actualOverlayWidth = Math.max(effectiveOverlayWidth, overlay.width);
 		const afterTarget = Math.max(0, totalWidth - actualBeforeWidth - actualOverlayWidth);
 		const afterPad = Math.max(0, afterTarget - base.afterWidth);
 
 		// Compose result
 		const r = TUI.SEGMENT_RESET;
+		// On lines clamped for being narrower than the terminal width, right-align
+		// the overlay content within its coverage: the padding goes to the
+		// content's left so the content hugs the base line's right edge (e.g. a
+		// box corner right after a corner toast) with no gap. Full-width lines
+		// keep the historical left-aligned padding.
+		const overlayLeadingPad = rightAlignOverlay ? overlayPad : 0;
+		const overlayTrailingPad = rightAlignOverlay ? 0 : overlayPad;
 		const result =
 			base.before +
 			" ".repeat(beforePad) +
 			r +
+			" ".repeat(overlayLeadingPad) +
 			overlay.text +
-			" ".repeat(overlayPad) +
+			" ".repeat(overlayTrailingPad) +
 			r +
 			base.after +
 			" ".repeat(afterPad);

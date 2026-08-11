@@ -2,6 +2,7 @@ import type { KimiHarness, Session } from '@moonshot-ai/kimi-code-sdk';
 import { compressImageForModel, persistOriginalImage, sessionMediaOriginalsDir } from '@moonshot-ai/kimi-code-sdk';
 
 import { ClipboardMediaError, readClipboardMedia } from '#/utils/clipboard/clipboard-image';
+import { copyTextToClipboard } from '#/utils/clipboard/clipboard-text';
 import { parseImageMeta } from '#/utils/image/image-mime';
 import { editInExternalEditor, resolveEditorCommand } from '#/utils/process/external-editor';
 
@@ -16,6 +17,7 @@ import {
 import { formatErrorMessage } from '../utils/event-payload';
 import type { ImageAttachmentStore } from '../utils/image-attachment-store';
 import { extractMediaAttachments } from '../utils/image-placeholder';
+import { showToast } from '../utils/toast';
 import type { PendingExit, QueuedMessage, SteerInputItem } from '../types';
 import type { TUIState } from '../tui-state';
 import type { BtwPanelController } from './btw-panel';
@@ -79,6 +81,18 @@ export class EditorKeyboardController {
     editor.onChange = (text: string) => {
       if (this.pendingExit) this.clearPendingExit();
       host.updateEditorBorderHighlight(text);
+    };
+
+    // Mouse-drag selection completes: copy the highlighted text to the
+    // clipboard (opencode-style copy-on-select) and confirm with a top-right
+    // toast. The editor keeps the selection so the user can still delete it.
+    editor.onCopySelection = (text: string) => {
+      host.track('shortcut_copy_selection');
+      void copyTextToClipboard(text)
+        .then(() => showToast(host.state.ui, 'Copied to clipboard'))
+        .catch((error: unknown) => {
+          host.showError(`Failed to copy selection: ${formatErrorMessage(error)}`);
+        });
     };
 
     // bash mode recalls only shell (`!`-prefixed) history entries; prompt mode

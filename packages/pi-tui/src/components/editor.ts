@@ -352,6 +352,13 @@ export class Editor implements Component, Focusable {
 	public onSubmit?: (text: string) => void;
 	public onChange?: (text: string) => void;
 	/**
+	 * Called when a mouse-drag selection completes (button release with an
+	 * active selection). The host typically copies the selected text to the
+	 * clipboard. The selection itself is kept after the callback so the user
+	 * can still delete or replace it.
+	 */
+	public onCopySelection?: (text: string) => void;
+	/**
 	 * Called when a history entry is recalled, before it is put into the buffer.
 	 * Return the text to display, or `undefined` to use the entry as-is. Lets the
 	 * host decorate entries (e.g. strip a marker) and react to recalls (e.g.
@@ -1189,6 +1196,15 @@ export class Editor implements Component, Focusable {
 			}
 			case "up": {
 				this.mouseDragging = false;
+				// Mouse-up copy-on-select: a completed drag selection is handed
+				// to the host (clipboard write + toast) while the highlight
+				// stays so the user can still delete or replace it.
+				if (this.selectionActive()) {
+					const text = this.getSelectedText();
+					if (text !== undefined && text.length > 0) {
+						this.onCopySelection?.(text);
+					}
+				}
 				return true;
 			}
 		}

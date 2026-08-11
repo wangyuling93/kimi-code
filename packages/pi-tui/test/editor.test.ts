@@ -4648,6 +4648,42 @@ describe("Editor mouse selection", () => {
 		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 0 });
 	});
 
+	it("releasing a drag selection fires onCopySelection with the selected text", () => {
+		const { editor } = createMouseEditor();
+		const copied: string[] = [];
+		editor.onCopySelection = (text) => copied.push(text);
+		editor.setText("hello world");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 0));
+		editor.handleMouse(mouseEvent("drag", 1, 4 + 5));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 5));
+		assert.deepStrictEqual(copied, ["hello"]);
+		// The selection stays after copy so Delete can still remove it.
+		assert.strictEqual(editor.selectionActive(), true);
+	});
+
+	it("a plain click does not fire onCopySelection", () => {
+		const { editor } = createMouseEditor();
+		let copied = 0;
+		editor.onCopySelection = () => {
+			copied++;
+		};
+		editor.setText("hello");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 2));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 2));
+		assert.strictEqual(copied, 0);
+	});
+
+	it("copy fires with multi-line selections", () => {
+		const { editor } = createMouseEditor();
+		const copied: string[] = [];
+		editor.onCopySelection = (text) => copied.push(text);
+		editor.setText("foo\nbar");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 0));
+		editor.handleMouse(mouseEvent("drag", 2, 4 + 3));
+		editor.handleMouse(mouseEvent("up", 2, 4 + 3));
+		assert.deepStrictEqual(copied, ["foo\nbar"]);
+	});
+
 });
 
 describe("TUI mouse dispatch", () => {
