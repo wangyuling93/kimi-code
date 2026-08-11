@@ -1,5 +1,11 @@
 # @moonshot-ai/kimi-code
 
+## 0.35.1
+
+### Patch Changes
+
+- [`192d3d0`](https://github.com/wangyuling93/kimi-code/commit/192d3d0d6504b35415c18999163befbd7bef135c) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Verify maintainer-PAT PR authorship (temporary).
+
 ## 0.35.0
 
 ### Minor Changes
