@@ -60,16 +60,22 @@ jobs:
           version: pnpm run version:release
           commit: "ci: release packages"
           title: "ci: release packages"
-          # Auto-merge the version PR once required checks pass. Needs the
-          # repo setting "Allow auto-merge" (Settings → General → Pull
-          # requests) and a branch protection rule requiring status checks.
-          enableAutoMerge: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Publishing uses npm OIDC trusted publishing (configured on the
           # package page); provenance is generated automatically. No token is
           # needed — NPM_TOKEN was only used to bootstrap the first publish.
           # id-token: write is granted above.
+
+      # Auto-merge the version PR once the required CI checks pass. Uses
+      # GitHub's native auto-merge (repo setting "Allow auto-merge" +
+      # branch protection requiring status checks); changesets/action has no
+      # such input of its own.
+      - name: Enable auto-merge on the version PR
+        if: steps.changesets.outputs.pullRequestNumber != ''
+        run: gh pr merge --repo "$GITHUB_REPOSITORY" --merge --auto "${{ steps.changesets.outputs.pullRequestNumber }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Resolve Kimi Code native release
         if: steps.changesets.outputs.published == 'true'
