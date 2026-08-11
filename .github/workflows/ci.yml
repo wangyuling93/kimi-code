@@ -131,3 +131,19 @@ jobs:
         run: pnpm --filter @moonshot-ai/vis-server run typecheck
       - name: Typecheck vis-web
         run: pnpm --filter @moonshot-ai/vis-web run typecheck
+
+  # Aggregate gate that carries the branch-protection required check "CI".
+  # GitHub names the workflow-level check after the workflow, but the PR merge
+  # machinery matches required contexts against job names here, so an explicit
+  # job named CI is needed for the required check to be satisfiable.
+  CI:
+    runs-on: ubuntu-latest
+    needs: [build, test, test-pi-tui, lint, typecheck]
+    if: always()
+    steps:
+      - name: Aggregate CI result
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more CI jobs failed" && exit 1
+          fi
+          echo "All CI jobs passed"
