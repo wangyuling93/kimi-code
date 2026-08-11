@@ -1,5 +1,11 @@
 # @moonshot-ai/kimi-code
 
+## 0.35.1
+
+### Patch Changes
+
+- [`1247322`](https://github.com/wangyuling93/kimi-code/commit/1247322dceb7a1e576d4a7f41c93d102b78ee4d2) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Test bot workflow approval policy (temporary changeset).
+
 ## 0.35.0
 
 ### Minor Changes
