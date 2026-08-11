@@ -766,7 +766,7 @@ export class Editor implements Component, Focusable {
 					// The character is already highlighted by the selection;
 					// keep it visible and just anchor the hardware cursor.
 					displayText = before + marker + after;
-				} else if (this.tui.getShowHardwareCursor()) {
+				} else if (this.tui.getShowHardwareCursor?.() === true) {
 					// The hardware cursor renders the caret (blinking block);
 					// only emit the positioning marker so it lands on the
 					// right cell — no static inverse-video block.
