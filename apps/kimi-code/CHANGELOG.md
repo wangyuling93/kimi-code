@@ -1,5 +1,11 @@
 # @moonshot-ai/kimi-code
 
+## 0.35.2
+
+### Patch Changes
+
+- [`7d9925d`](https://github.com/wangyuling93/kimi-code/commit/7d9925d462befe5e567624d84a28da6d008308be) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Test release-on-merge via pull_request closed (temporary).
+
 ## 0.35.1
 
 ### Patch Changes
