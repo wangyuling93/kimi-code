@@ -96,7 +96,10 @@ jobs:
         if: steps.changesets.outputs.pullRequestNumber != ''
         run: gh pr merge --repo "$GITHUB_REPOSITORY" --merge --auto "${{ steps.changesets.outputs.pullRequestNumber }}"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Auto-merge with the maintainer's PAT: merges performed with the
+          # GITHUB_TOKEN are attributed to github-actions[bot], whose push /
+          # closed events do not trigger workflows.
+          GH_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
 
       - name: Resolve Kimi Code native release
         if: steps.changesets.outputs.published == 'true'
