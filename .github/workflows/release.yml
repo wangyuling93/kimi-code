@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  # The version PR is merged via auto-merge, which does not emit a push event;
+  # fire the release from the merge's pull_request closed event instead.
+  pull_request:
+    types: [closed]
+    branches:
+      - main
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -11,7 +17,12 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'wangyuling93'
+    if: >
+      github.repository_owner == 'wangyuling93' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.head.ref == 'changeset-release/main'))
     outputs:
       packages_published: ${{ steps.changesets.outputs.published }}
       kimi_native_release: ${{ steps.kimi-release.outputs.should_publish }}
@@ -25,6 +36,9 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          # On pull_request (closed) events the checkout defaults to the PR
+          # merge ref; always base the release on main's post-merge state.
+          ref: main
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
