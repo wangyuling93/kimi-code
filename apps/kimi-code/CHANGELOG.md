@@ -1,5 +1,11 @@
 # @moonshot-ai/kimi-code
 
+## 0.35.3
+
+### Patch Changes
+
+- [`fdf34ba`](https://github.com/wangyuling93/kimi-code/commit/fdf34ba4564c471f99f618fbe2ea96a84040332f) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Test PAT auto-merge closed-event release (temporary).
+
 ## 0.35.2
 
 ### Patch Changes
