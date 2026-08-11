@@ -16,7 +16,7 @@
  */
 
 import { Container } from '@moonshot-ai/pi-tui';
-import type { Component } from '@moonshot-ai/pi-tui';
+import type { Component, RenderContext } from '@moonshot-ai/pi-tui';
 
 import { isRenderCacheEnabled } from '#/tui/utils/render-cache';
 
@@ -42,7 +42,7 @@ export class GutterContainer extends Container {
     super.invalidate();
   }
 
-  override render(width: number): string[] {
+  override render(width: number, ctx?: RenderContext): string[] {
     const inner = Math.max(1, width - this.leftPad - this.rightPad);
     const lead = ' '.repeat(this.leftPad);
 
@@ -59,8 +59,22 @@ export class GutterContainer extends Container {
     let allReused = cacheValid;
 
     let i = 0;
+    let row = 0;
     for (const child of this.children) {
-      const lines = child.render(inner);
+      // Thread the render context so leaf components register mouse hit
+      // regions with the gutter's column offset applied.
+      const childCtx = ctx ? { row: ctx.row + row, col: ctx.col + this.leftPad, regions: ctx.regions } : undefined;
+      const lines = child.render(inner, childCtx);
+      if (childCtx && !(child instanceof Container)) {
+        childCtx.regions.push({
+          component: child,
+          rowStart: childCtx.row,
+          colStart: childCtx.col,
+          rowEnd: childCtx.row + lines.length,
+          colEnd: childCtx.col + inner,
+        });
+      }
+      row += lines.length;
       childRefs.push(child);
       childRenderRefs.push(lines);
       const reused = cacheValid && cache.childRefs[i] === child && cache.childRenderRefs[i] === lines;

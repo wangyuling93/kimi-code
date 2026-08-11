@@ -788,3 +788,16 @@ describe('CustomEditor bash mode file completion', () => {
     expect(calls.every((call) => call.force === true)).toBe(true);
   });
 });
+
+describe('CustomEditor mouse hit-testing offsets', () => {
+  it('maps the first content line behind the prompt and later lines behind the border', () => {
+    const editor = makeEditor();
+    const offsets = editor as unknown as { getTextColOffset(row: number): number };
+    // Row 0 of the rendered box is the top border; content rows start at 1.
+    // The first content line carries `│ <gap> > <gap>` (offset 4); other
+    // lines only have the left border `│` (offset 1).
+    expect(offsets.getTextColOffset(0)).toBe(4);
+    expect(offsets.getTextColOffset(1)).toBe(1);
+    expect(offsets.getTextColOffset(2)).toBe(1);
+  });
+});

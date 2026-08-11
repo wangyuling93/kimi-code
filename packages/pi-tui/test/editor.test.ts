@@ -4,7 +4,8 @@ import { stripVTControlCharacters } from "node:util";
 import { type AutocompleteProvider, CombinedAutocompleteProvider } from "../src/autocomplete.ts";
 import { Editor, wordWrapLine } from "../src/components/editor.ts";
 import { PasteBurst } from "../src/paste-burst.ts";
-import { TUI } from "../src/tui.ts";
+import { Container, TUI } from "../src/tui.ts";
+import type { RenderContext } from "../src/tui.ts";
 import { visibleWidth } from "../src/utils.ts";
 import { defaultEditorTheme } from "./test-themes.ts";
 import { VirtualTerminal } from "./virtual-terminal.ts";
@@ -4448,5 +4449,360 @@ describe("Editor narrow width rendering", () => {
 		editor.setText("你好世界");
 		assert.doesNotThrow(() => editor.render(0));
 		assert.doesNotThrow(() => editor.render(-1));
+	});
+});
+
+describe("Editor mouse selection", () => {
+	function createMouseEditor(
+		cols = 80,
+		rows = 24,
+		options: { paddingX?: number } = {},
+	): { editor: Editor; tui: TUI; terminal: VirtualTerminal } {
+		const terminal = new VirtualTerminal(cols, rows);
+		const tui = new TUI(terminal);
+		const editor = new Editor(tui, defaultEditorTheme, { paddingX: options.paddingX ?? 4 });
+		return { editor, tui, terminal };
+	}
+
+	function mouseEvent(
+		type: "down" | "up" | "drag",
+		row: number,
+		col: number,
+		modifiers: { shift?: boolean; alt?: boolean; ctrl?: boolean } = {},
+	) {
+		return {
+			type,
+			button: 0,
+			row,
+			col,
+			modifiers: { shift: modifiers.shift ?? false, alt: modifiers.alt ?? false, ctrl: modifiers.ctrl ?? false },
+		};
+	}
+
+	it("click moves the cursor to the clicked cell", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello");
+		// Content row 0 is local row 1; text column 0 is local column 4 (paddingX).
+		editor.handleMouse(mouseEvent("down", 1, 4 + 2));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 2));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 2 });
+		assert.strictEqual(editor.selectionActive(), false);
+	});
+
+	it("clicking past the end of the text places the cursor at the end", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 50));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 50));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 5 });
+	});
+
+	it("clicking on the left padding places the cursor at the line start", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello");
+		editor.handleMouse(mouseEvent("down", 1, 1));
+		editor.handleMouse(mouseEvent("up", 1, 1));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 0 });
+	});
+
+	it("clicking on the top or bottom border is a no-op", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello");
+		editor.handleMouse(mouseEvent("down", 0, 4 + 2)); // top border
+		editor.handleMouse(mouseEvent("up", 0, 4 + 2));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 5 });
+		editor.handleMouse(mouseEvent("down", 2, 4 + 2)); // bottom border
+		editor.handleMouse(mouseEvent("up", 2, 4 + 2));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 5 });
+	});
+
+	it("drag from the anchor to the focus selects text", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello world");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 0));
+		editor.handleMouse(mouseEvent("drag", 1, 4 + 5));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 5));
+		assert.strictEqual(editor.selectionActive(), true);
+		assert.strictEqual(editor.getSelectedText(), "hello");
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 5 });
+	});
+
+	it("drag backwards (anchor after focus) selects correctly", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello world");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 9));
+		editor.handleMouse(mouseEvent("drag", 1, 4 + 2));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 2));
+		assert.strictEqual(editor.getSelectedText(), "llo wor");
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 2 });
+	});
+
+	it("Delete removes the whole selection instead of one character", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello world");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 0));
+		editor.handleMouse(mouseEvent("drag", 1, 4 + 5));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 5));
+		editor.handleInput("\x1b[3~"); // Delete
+		assert.strictEqual(editor.getText(), " world");
+		assert.strictEqual(editor.selectionActive(), false);
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 0 });
+	});
+
+	it("Backspace removes the whole selection", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello world");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 6));
+		editor.handleMouse(mouseEvent("drag", 1, 4 + 11));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 11));
+		editor.handleInput("\x7f"); // Backspace
+		assert.strictEqual(editor.getText(), "hello ");
+	});
+
+	it("typing replaces the selection", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello world");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 0));
+		editor.handleMouse(mouseEvent("drag", 1, 4 + 5));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 5));
+		editor.handleInput("Y");
+		assert.strictEqual(editor.getText(), "Y world");
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 1 });
+	});
+
+	it("a plain click drops a previous selection", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello world");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 0));
+		editor.handleMouse(mouseEvent("drag", 1, 4 + 5));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 5));
+		assert.strictEqual(editor.selectionActive(), true);
+		editor.handleMouse(mouseEvent("down", 1, 4 + 8));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 8));
+		assert.strictEqual(editor.selectionActive(), false);
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 8 });
+	});
+
+	it("keyboard movement clears the selection", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello world");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 0));
+		editor.handleMouse(mouseEvent("drag", 1, 4 + 5));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 5));
+		editor.handleInput("\x1b[C"); // Right arrow
+		assert.strictEqual(editor.selectionActive(), false);
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 6 });
+	});
+
+	it("multi-line selection spans lines and deletes the joined result", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("foo\nbar");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 1));
+		editor.handleMouse(mouseEvent("drag", 2, 4 + 2));
+		editor.handleMouse(mouseEvent("up", 2, 4 + 2));
+		assert.strictEqual(editor.getSelectedText(), "oo\nba");
+		editor.handleInput("\x1b[3~"); // Delete
+		assert.strictEqual(editor.getText(), "fr");
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 1 });
+	});
+
+	it("wrapped lines map clicks to the correct logical position", () => {
+		const { editor } = createMouseEditor(80, 24, { paddingX: 0 });
+		// layoutWidth with paddingX 0 is 79; a 160-char run wraps into
+		// rows [0,79), [79,158), [158,160).
+		editor.setText("a".repeat(160));
+		editor.handleMouse(mouseEvent("down", 2, 5)); // second visual row
+		editor.handleMouse(mouseEvent("up", 2, 5));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 79 + 5 });
+		editor.handleMouse(mouseEvent("down", 3, 0)); // third visual row
+		editor.handleMouse(mouseEvent("up", 3, 0));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 158 });
+	});
+
+	it("wide characters: clicking the left half places the cursor before, the right half after", () => {
+		const { editor } = createMouseEditor(80, 24, { paddingX: 0 });
+		editor.setText("中a");
+		editor.handleMouse(mouseEvent("down", 1, 0));
+		editor.handleMouse(mouseEvent("up", 1, 0));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 0 });
+		editor.handleMouse(mouseEvent("down", 1, 1));
+		editor.handleMouse(mouseEvent("up", 1, 1));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 1 });
+		editor.handleMouse(mouseEvent("down", 1, 3));
+		editor.handleMouse(mouseEvent("up", 1, 3));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 2 });
+	});
+
+	it("alt-modified events are ignored (native terminal selection)", () => {
+		const { editor } = createMouseEditor();
+		editor.setText("hello");
+		editor.handleMouse(mouseEvent("down", 1, 4 + 2, { alt: true }));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 2, { alt: true }));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 5 });
+	});
+
+	it("empty editor: clicking anywhere keeps the cursor at (0,0)", () => {
+		const { editor } = createMouseEditor();
+		editor.handleMouse(mouseEvent("down", 1, 4 + 10));
+		editor.handleMouse(mouseEvent("up", 1, 4 + 10));
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 0 });
+	});
+
+});
+
+describe("TUI mouse dispatch", () => {
+	async function renderAndFlush(tui: TUI, terminal: VirtualTerminal): Promise<void> {
+		tui.requestRender(true);
+		await new Promise<void>((resolve) => process.nextTick(resolve));
+		await terminal.waitForRender();
+	}
+
+	it("routes SGR mouse events to the editor under the pointer", async () => {
+		const terminal = new VirtualTerminal(80, 24);
+		const tui = new TUI(terminal);
+		const editor = new Editor(tui, defaultEditorTheme, { paddingX: 4 });
+		tui.addChild(editor);
+		editor.setText("hello world");
+		tui.start();
+		await renderAndFlush(tui, terminal);
+
+		// Editor box occupies buffer rows 0-2 (border/content/border) at
+		// column 0. SGR coordinates are 1-based: screen col N (0-based) is
+		// sent as N+1, and text column T appears at screen col T+4 (paddingX).
+		terminal.sendInput("\x1b[<0;11;2M"); // left button down at text col 6
+		terminal.sendInput("\x1b[<32;16;2M"); // drag to text col 11 (past "world")
+		terminal.sendInput("\x1b[<0;16;2m"); // release
+		assert.strictEqual(editor.selectionActive(), true);
+		assert.strictEqual(editor.getSelectedText(), "world");
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 11 });
+		tui.stop();
+	});
+
+	it("buffers SGR sequences split across input chunks", async () => {
+		const terminal = new VirtualTerminal(80, 24);
+		const tui = new TUI(terminal);
+		const editor = new Editor(tui, defaultEditorTheme, { paddingX: 4 });
+		tui.addChild(editor);
+		editor.setText("hello world");
+		tui.start();
+		await renderAndFlush(tui, terminal);
+
+		terminal.sendInput("\x1b[<0;9");
+		terminal.sendInput(";2M"); // remainder of the same down event (text col 4)
+		terminal.sendInput("\x1b[<0;9;2m"); // release
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 4 });
+		tui.stop();
+	});
+
+	it("mouse sequences do not leak into keyboard input", async () => {
+		const terminal = new VirtualTerminal(80, 24);
+		const tui = new TUI(terminal);
+		const editor = new Editor(tui, defaultEditorTheme, { paddingX: 4 });
+		tui.addChild(editor);
+		editor.setText("hello world");
+		tui.start();
+		await renderAndFlush(tui, terminal);
+
+		terminal.sendInput("\x1b[<0;7;2M"); // click at text col 2
+		terminal.sendInput("\x1b[<0;7;2m");
+		assert.strictEqual(editor.getText(), "hello world");
+		// Cursor moved to column 2, nothing inserted.
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 2 });
+		tui.stop();
+	});
+
+	it("drag beyond the editor box extends the selection to the edge", async () => {
+		const terminal = new VirtualTerminal(80, 24);
+		const tui = new TUI(terminal);
+		const editor = new Editor(tui, defaultEditorTheme, { paddingX: 4 });
+		tui.addChild(editor);
+		editor.setText("hello world");
+		tui.start();
+		await renderAndFlush(tui, terminal);
+
+		// Down at text col 0 (screen col 5, 1-based), drag to screen col 70
+		// (well past the text) and row 24 (below the editor box).
+		terminal.sendInput("\x1b[<0;5;2M");
+		terminal.sendInput("\x1b[<32;70;24M");
+		terminal.sendInput("\x1b[<0;70;24m");
+		assert.strictEqual(editor.getSelectedText(), "hello world");
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 11 });
+		tui.stop();
+	});
+
+	it("routes events through a horizontally padded container (gutter layout)", async () => {
+		// Mirrors kimi-code's GutterContainer: children render at a reduced
+		// width and their output is prefixed with the left gutter.
+		class PaddedContainer extends Container {
+			private readonly pad: number;
+			constructor(pad: number) {
+				super();
+				this.pad = pad;
+			}
+			override render(width: number, ctx?: RenderContext): string[] {
+				const inner = Math.max(1, width - this.pad);
+				const lines: string[] = [];
+				let row = 0;
+				for (const child of this.children) {
+					const childCtx = ctx ? { row: ctx.row + row, col: ctx.col + this.pad, regions: ctx.regions } : undefined;
+					const childLines = child.render(inner, childCtx);
+					if (childCtx && !(child instanceof Container)) {
+						childCtx.regions.push({
+							component: child,
+							rowStart: childCtx.row,
+							colStart: childCtx.col,
+							rowEnd: childCtx.row + childLines.length,
+							colEnd: childCtx.col + inner,
+						});
+					}
+					row += childLines.length;
+					for (const line of childLines) lines.push(" ".repeat(this.pad) + line);
+				}
+				return lines;
+			}
+		}
+		const terminal = new VirtualTerminal(80, 24);
+		const tui = new TUI(terminal);
+		const editor = new Editor(tui, defaultEditorTheme, { paddingX: 0 });
+		const padded = new PaddedContainer(3);
+		padded.addChild(editor);
+		tui.addChild(padded);
+		editor.setText("hello");
+		tui.start();
+		await renderAndFlush(tui, terminal);
+
+		// Text column 2 sits at screen column 3 (gutter) + 2 = 5 → 1-based 6.
+		terminal.sendInput("\x1b[<0;6;2M");
+		terminal.sendInput("\x1b[<0;6;2m");
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 2 });
+		tui.stop();
+	});
+
+	it("accounts for the viewport when content above the editor scrolls", async () => {
+		class Rows implements Component {
+			private readonly n: number;
+			constructor(n: number) {
+				this.n = n;
+			}
+			render(): string[] {
+				return Array.from({ length: this.n }, () => "");
+			}
+			invalidate(): void {}
+		}
+		const terminal = new VirtualTerminal(80, 24);
+		const tui = new TUI(terminal);
+		const editor = new Editor(tui, defaultEditorTheme, { paddingX: 4 });
+		tui.addChild(new Rows(30));
+		tui.addChild(editor);
+		editor.setText("hello world");
+		tui.start();
+		await renderAndFlush(tui, terminal);
+
+		// 33 buffer rows, 24-row terminal → viewportTop 9. The editor's
+		// content row 0 is buffer row 31 → screen row 22 (1-based 23).
+		terminal.sendInput("\x1b[<0;7;23M"); // click at text col 2
+		terminal.sendInput("\x1b[<0;7;23m");
+		assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 2 });
+		tui.stop();
 	});
 });

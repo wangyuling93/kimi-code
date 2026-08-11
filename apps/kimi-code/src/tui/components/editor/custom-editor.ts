@@ -256,6 +256,16 @@ export class CustomEditor extends Editor {
     (this as unknown as AutocompleteInternals).cancelAutocomplete();
   }
 
+  /**
+   * Mouse hit-testing offset: column 0 of the rendered box is the left side
+   * border (│); the first content line additionally carries the `>`/`!`
+   * prompt at columns 2-3 (see injectPromptSymbol), pushing text column 0 to
+   * screen column 4.
+   */
+  protected override getTextColOffset(contentRow: number): number {
+    return contentRow === 0 ? 4 : 1;
+  }
+
   override render(width: number): string[] {
     const lines = super.render(width);
     if (lines.length < 3) return lines;

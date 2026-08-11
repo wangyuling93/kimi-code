@@ -69,20 +69,125 @@ function extractKittyImageRows(line: string): number {
 }
 
 /**
+ * Mouse event delivered to a component via {@link Component.handleMouse}.
+ * `row`/`col` are local coordinates inside the component's rendered box.
+ */
+export interface MouseEvent {
+	type: "down" | "up" | "drag";
+	/** Mouse button: 0 = left, 1 = middle, 2 = right. */
+	button: number;
+	row: number;
+	col: number;
+	modifiers: { shift: boolean; alt: boolean; ctrl: boolean };
+}
+
+/**
+ * Render-time layout context threaded through the component tree. Carries the
+ * component's position in the output buffer plus the mouse-region collector so
+ * leaf components register hit regions while they render.
+ */
+export interface RenderContext {
+	/** Buffer row where this component's rendered output starts. */
+	row: number;
+	/** Buffer column where this component's rendered output starts. */
+	col: number;
+	/** Mouse hit-region collector for the current render pass. */
+	regions: MouseRegion[];
+}
+
+/** Rectangle occupied by a rendered leaf component (buffer coordinates). */
+export interface MouseRegion {
+	component: Component;
+	rowStart: number;
+	colStart: number;
+	rowEnd: number;
+	colEnd: number;
+}
+
+/** Raw SGR mouse event as parsed from the terminal (screen coordinates). */
+interface RawMouseInput {
+	type: "down" | "up" | "drag" | "move" | "scroll";
+	button: number;
+	row: number;
+	col: number;
+	modifiers: { shift: boolean; alt: boolean; ctrl: boolean };
+}
+
+/**
+ * Parse an SGR mouse sequence (`ESC [ <b;c;r M|m`, terminal mode 1006) at
+ * `offset`. Returns the decoded event and its sequence length, "incomplete"
+ * when the sequence is split across input chunks, or null when the text is
+ * not a valid sequence.
+ */
+function parseSgrMouseEvent(
+	str: string,
+	offset: number,
+): { event: RawMouseInput; length: number } | "incomplete" | null {
+	if (!str.startsWith("\x1b[<", offset)) return null;
+	for (let i = offset + 3; i < str.length; i++) {
+		const ch = str[i]!;
+		if (ch === "M" || ch === "m") {
+			const params = str.slice(offset + 3, i);
+			if (!/^\d+;\d+;\d+$/.test(params)) return null;
+			const [code, colText, rowText] = params.split(";");
+			const buttonCode = Number(code);
+			const col = Number(colText) - 1;
+			const row = Number(rowText) - 1;
+			if (col < 0 || row < 0) return null;
+			const button = buttonCode & 3;
+			const isScroll = (buttonCode & 64) !== 0;
+			const isMotion = (buttonCode & 32) !== 0;
+			const modifiers = {
+				shift: (buttonCode & 4) !== 0,
+				alt: (buttonCode & 8) !== 0,
+				ctrl: (buttonCode & 16) !== 0,
+			};
+			let type: RawMouseInput["type"];
+			if (isScroll) {
+				type = "scroll";
+			} else if (isMotion) {
+				// 1002 mode only reports motion while a button is held, so
+				// button-carrying motion is a drag; button 3 + motion is a
+				// button-less move (only emitted in 1003 mode).
+				type = button === 3 ? "move" : "drag";
+			} else if (ch === "m") {
+				type = "up";
+			} else {
+				type = "down";
+			}
+			return {
+				event: { type, button: button === 3 ? 0 : button, row, col, modifiers },
+				length: i - offset + 1,
+			};
+		}
+		if (ch !== ";" && (ch < "0" || ch > "9")) return null;
+	}
+	return "incomplete";
+}
+
+/**
  * Component interface - all components must implement this
  */
 export interface Component {
 	/**
 	 * Render the component to lines for the given viewport width
 	 * @param width - Current viewport width
+	 * @param ctx - Optional render context threaded through the component tree
+	 *              (mouse hit-region collection); containers forward it down.
 	 * @returns Array of strings, each representing a line
 	 */
-	render(width: number): string[];
+	render(width: number, ctx?: RenderContext): string[];
 
 	/**
 	 * Optional handler for keyboard input when component has focus
 	 */
 	handleInput?(data: string): void;
+
+	/**
+	 * Optional handler for mouse events. Coordinates are local to the
+	 * component's rendered box (0-based, top-left origin).
+	 */
+	handleMouse?(event: MouseEvent): boolean;
 
 	/**
 	 * If true, component receives key release events (Kitty protocol).
@@ -287,16 +392,30 @@ export class Container implements Component {
 		}
 	}
 
-	render(width: number): string[] {
+	render(width: number, ctx?: RenderContext): string[] {
 		// Extremely narrow terminals can report tiny or even non-positive
 		// column counts; never propagate a width below 1 into components.
 		width = Math.max(1, width);
 		const lines: string[] = [];
+		let row = 0;
 		for (const child of this.children) {
-			const childLines = child.render(width);
+			const childCtx = ctx ? { row: ctx.row + row, col: ctx.col, regions: ctx.regions } : undefined;
+			const childLines = child.render(width, childCtx);
+			// Only leaf components are mouse targets; containers resolve their
+			// own children recursively during the same render pass.
+			if (childCtx && !(child instanceof Container)) {
+				childCtx.regions.push({
+					component: child,
+					rowStart: childCtx.row,
+					colStart: childCtx.col,
+					rowEnd: childCtx.row + childLines.length,
+					colEnd: childCtx.col + width,
+				});
+			}
 			for (const line of childLines) {
 				lines.push(line);
 			}
+			row += childLines.length;
 		}
 		return lines;
 	}
@@ -338,6 +457,12 @@ export class TUI extends Container {
 	private previousViewportTop = 0; // Track previous viewport top for resize-aware cursor moves
 	private fullRedrawCount = 0;
 	private stopped = false;
+	// Mouse input (SGR tracking, terminal modes 1000 + 1002 + 1006)
+	private mouseTrackingEnabled = false;
+	private mouseInputBuffer = "";
+	private mouseRegions: MouseRegion[] = [];
+	private overlayMouseRegions: MouseRegion[] = [];
+	private mouseCapture: { component: Component; region: MouseRegion } | null = null;
 	private pendingOsc11BackgroundReplies = 0;
 	private pendingOsc11BackgroundQueries: PendingOsc11BackgroundQuery[] = [];
 	private terminalColorSchemeListeners = new Set<(scheme: TerminalColorScheme) => void>();
@@ -655,12 +780,28 @@ export class TUI extends Container {
 		for (const overlay of this.overlayStack) overlay.component.invalidate?.();
 	}
 
+	override render(width: number): string[] {
+		// Rebuild mouse hit regions from the current layout on every render.
+		this.mouseRegions = [];
+		return super.render(width, { row: 0, col: 0, regions: this.mouseRegions });
+	}
+
 	start(): void {
 		this.stopped = false;
 		this.terminal.start(
 			(data) => this.handleInput(data),
 			() => this.requestRender(),
 		);
+		// Clear the screen so rendering starts at the top-left cell. Without
+		// this, the first render is emitted at the cursor position left behind
+		// by the parent shell, shifting every rendered row down and breaking
+		// screen-coordinate consumers (mouse hit-testing).
+		this.terminal.write("\x1b[2J\x1b[H");
+		// Enable SGR mouse tracking: click (1000), button-event/drag (1002),
+		// SGR encoding (1006). 1003 (any-move) is intentionally not enabled —
+		// only press/drag/release are reported.
+		this.terminal.write("\x1b[?1000h\x1b[?1002h\x1b[?1006h");
+		this.mouseTrackingEnabled = true;
 		this.terminal.hideCursor();
 		if (this.terminalColorSchemeNotificationsEnabled) {
 			this.terminal.write("\x1b[?2031h");
@@ -709,6 +850,12 @@ export class TUI extends Container {
 
 	stop(): void {
 		this.stopped = true;
+		// Disable mouse tracking so the terminal stops reporting pointer
+		// events (and restores native selection) during teardown.
+		this.terminal.write("\x1b[?1000l\x1b[?1002l\x1b[?1006l");
+		this.mouseTrackingEnabled = false;
+		this.mouseInputBuffer = "";
+		this.mouseCapture = null;
 		if (this.renderTimer) {
 			clearTimeout(this.renderTimer);
 			this.renderTimer = undefined;
@@ -811,6 +958,14 @@ export class TUI extends Container {
 			return;
 		}
 
+		// Mouse input (SGR): parse and dispatch to the component under the
+		// pointer. Any non-mouse remainder continues to normal input handling.
+		const mouseRest = this.consumeMouseInput(data);
+		if (mouseRest !== null) {
+			if (mouseRest.length === 0) return;
+			data = mouseRest;
+		}
+
 		// Global debug key handler (Shift+Ctrl+D)
 		if (matchesKey(data, "shift+ctrl+d") && this.onDebug) {
 			this.onDebug();
@@ -854,6 +1009,119 @@ export class TUI extends Container {
 			}
 			this.focusedComponent.handleInput(data);
 			this.requestRender();
+		}
+	}
+
+	/**
+	 * Extract SGR mouse sequences from an input chunk, dispatching each event
+	 * and returning the non-mouse remainder (or null when mouse tracking is
+	 * off). Split sequences are buffered across chunks.
+	 */
+	private consumeMouseInput(data: string): string | null {
+		if (!this.mouseTrackingEnabled) return null;
+		const combined = this.mouseInputBuffer + data;
+		this.mouseInputBuffer = "";
+		const out: string[] = [];
+		let cursor = 0;
+		while (cursor < combined.length) {
+			const intro = combined.indexOf("\x1b[<", cursor);
+			if (intro === -1) {
+				out.push(combined.slice(cursor));
+				break;
+			}
+			if (intro > cursor) out.push(combined.slice(cursor, intro));
+			const parsed = parseSgrMouseEvent(combined, intro);
+			if (parsed === "incomplete") {
+				// Tail of a split sequence — buffer it and stop.
+				this.mouseInputBuffer = combined.slice(intro);
+				break;
+			}
+			if (parsed === null) {
+				// Not a valid SGR mouse sequence; pass the introducer through
+				// and keep scanning.
+				out.push("\x1b[<");
+				cursor = intro + 3;
+				continue;
+			}
+			this.dispatchMouseEvent(parsed.event);
+			cursor = intro + parsed.length;
+		}
+		return out.join("");
+	}
+
+	private dispatchMouseEvent(raw: RawMouseInput): void {
+		if (raw.type === "scroll" || raw.type === "move") return;
+		// Mouse input changes component state (cursor, selection) — schedule a
+		// render so the change reaches the screen.
+		this.requestRender();
+
+		// Drag/up after a press: keep delivering to the component where the
+		// press started, clamping coordinates into its region so a drag beyond
+		// the box still extends the selection to the edge.
+		if (raw.type !== "down") {
+			const captured = this.mouseCapture;
+			if (!captured) return;
+			const bufferRow = raw.row + this.previousViewportTop;
+			const clamped: RawMouseInput = {
+				...raw,
+				row: Math.max(captured.region.rowStart, Math.min(bufferRow, captured.region.rowEnd - 1)),
+				col: Math.max(captured.region.colStart, Math.min(raw.col, captured.region.colEnd - 1)),
+			};
+			this.deliverMouseEvent(clamped, captured.region, { release: raw.type === "up" });
+			return;
+		}
+
+		// Overlays are composited on top of base content: hit them first.
+		for (let i = this.overlayMouseRegions.length - 1; i >= 0; i--) {
+			const region = this.overlayMouseRegions[i]!;
+			if (
+				raw.row >= region.rowStart &&
+				raw.row < region.rowEnd &&
+				raw.col >= region.colStart &&
+				raw.col < region.colEnd
+			) {
+				this.deliverMouseEvent(raw, region);
+				return;
+			}
+		}
+		const bufferRow = raw.row + this.previousViewportTop;
+		for (let i = this.mouseRegions.length - 1; i >= 0; i--) {
+			const region = this.mouseRegions[i]!;
+			if (
+				bufferRow >= region.rowStart &&
+				bufferRow < region.rowEnd &&
+				raw.col >= region.colStart &&
+				raw.col < region.colEnd
+			) {
+				// Deliver in buffer coordinates (local = buffer - region origin).
+				this.deliverMouseEvent({ ...raw, row: bufferRow }, region);
+				return;
+			}
+		}
+	}
+
+	private deliverMouseEvent(
+		raw: RawMouseInput,
+		region: MouseRegion,
+		options: { release?: boolean } = {},
+	): void {
+		if (raw.type === "scroll" || raw.type === "move") return;
+		const event: MouseEvent = {
+			type: raw.type,
+			button: raw.button,
+			row: raw.row - region.rowStart,
+			col: raw.col - region.colStart,
+			modifiers: raw.modifiers,
+		};
+		const target = region.component;
+		if (target.handleMouse) {
+			target.handleMouse(event);
+			// Capture the pointer so drags/ups keep flowing to this component
+			// even after the pointer leaves its region.
+			this.mouseCapture = raw.type === "down" ? { component: target, region } : this.mouseCapture;
+		}
+		if (options.release) {
+			this.mouseCapture = null;
 		}
 	}
 
@@ -1053,11 +1321,15 @@ export class TUI extends Container {
 
 	/** Composite all overlays into content lines (sorted by focusOrder, higher = on top). */
 	private compositeOverlays(lines: string[], termWidth: number, termHeight: number): string[] {
-		if (this.overlayStack.length === 0) return lines;
+		if (this.overlayStack.length === 0) {
+			this.overlayMouseRegions = [];
+			return lines;
+		}
 		const result = [...lines];
 
 		// Pre-render all visible overlays and calculate positions
 		const rendered: { overlayLines: string[]; row: number; col: number; w: number }[] = [];
+		const overlayRegions: MouseRegion[] = [];
 		let minLinesNeeded = result.length;
 
 		const visibleEntries = this.overlayStack.filter((e) => this.isOverlayVisible(e));
@@ -1082,7 +1354,17 @@ export class TUI extends Container {
 
 			rendered.push({ overlayLines, row, col, w: width });
 			minLinesNeeded = Math.max(minLinesNeeded, row + overlayLines.length);
+			// Overlay regions are tracked in screen coordinates (they are
+			// composited at a fixed screen position regardless of viewport).
+			overlayRegions.push({
+				component,
+				rowStart: row,
+				colStart: col,
+				rowEnd: row + overlayLines.length,
+				colEnd: col + width,
+			});
 		}
+		this.overlayMouseRegions = overlayRegions;
 
 		// Pad to at least terminal height so overlays have screen-relative positions.
 		// Excludes maxLinesRendered: the historical high-water mark caused self-reinforcing
