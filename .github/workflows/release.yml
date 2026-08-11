@@ -60,6 +60,11 @@ jobs:
           version: pnpm run version:release
           commit: "ci: release packages"
           title: "ci: release packages"
+          # Use the maintainer's PAT so the version PR is authored by a real
+          # account: PRs created by github-actions[bot] always require manual
+          # workflow approval (the bot has no contribution history), which
+          # stalls the auto-merge loop.
+          github-token: ${{ secrets.CHANGESETS_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Publishing uses npm OIDC trusted publishing (configured on the
