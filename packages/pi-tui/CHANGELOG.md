@@ -1,5 +1,17 @@
 # @moonshot-ai/pi-tui
 
+## 0.81.0
+
+### Minor Changes
+
+- [`40c4f49`](https://github.com/wangyuling93/kimi-code/commit/40c4f495022e959122785c63686ce2400cfdf4ca) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Add SGR mouse tracking with per-render hit-region dispatch, and click/drag text selection to the editor input.
+
+### Patch Changes
+
+- [`fa0660f`](https://github.com/wangyuling93/kimi-code/commit/fa0660f27262520c3c39aade5de6f1faec6b100f) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Render the caret as the terminal's blinking block cursor with an optional OSC 12 color, and hide it while a text selection is active.
+
+- [`ba21dd6`](https://github.com/wangyuling93/kimi-code/commit/ba21dd62a9516ac1a680b62e8d31ff41da5bd4b4) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Fix overlay compositing on lines narrower than the terminal width (keep the line's right-edge corner intact) and avoid full-screen redraws when an overlay appears.
+
 ## 0.80.8
 
 ### Patch Changes
