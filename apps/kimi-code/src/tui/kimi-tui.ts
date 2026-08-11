@@ -706,6 +706,11 @@ export class KimiTUI {
     // event loop (e.g. a future TUI reconnect) can't stack duplicate listeners.
     this.disposeTerminalTracking();
     this.state.ui.start();
+    // Show the blinking block hardware cursor at the editor's caret (matching
+    // opentui/grok) instead of the static inverse-video block, tinted with the
+    // theme's primary accent.
+    this.state.ui.setShowHardwareCursor(true);
+    this.state.ui.setCursorColor(currentTheme.color('primary'));
     this.startClipboardImageHintController();
     this.terminalFocusTrackingDispose = installTerminalFocusTracking(this.state);
     this.refreshTerminalThemeTracking();

@@ -452,6 +452,8 @@ export class TUI extends Container {
 	private cursorRow = 0; // Logical cursor row (end of rendered content)
 	private hardwareCursorRow = 0; // Actual terminal cursor row (may differ due to IME positioning)
 	private showHardwareCursor = process.env['PI_HARDWARE_CURSOR'] === "1";
+	/** Cursor color (hex, e.g. "#4FA8FF") applied via OSC 12 while the hardware cursor is shown. */
+	private cursorColor: string | undefined;
 	private clearOnShrink = process.env['PI_CLEAR_ON_SHRINK'] === "1"; // Clear empty rows when content shrinks (default: off)
 	private maxLinesRendered = 0; // Track terminal's working area (max lines ever rendered)
 	private previousViewportTop = 0; // Track previous viewport top for resize-aware cursor moves
@@ -487,6 +489,16 @@ export class TUI extends Container {
 
 	getShowHardwareCursor(): boolean {
 		return this.showHardwareCursor;
+	}
+
+	/**
+	 * Set the hardware cursor color (OSC 12, hex like "#4FA8FF"). The color is
+	 * re-applied whenever the cursor is positioned; callers usually pass their
+	 * theme's accent color. Pass undefined to leave the terminal default.
+	 */
+	setCursorColor(color: string | undefined): void {
+		this.cursorColor = color;
+		this.requestRender();
 	}
 
 	setShowHardwareCursor(enabled: boolean): void {
@@ -876,6 +888,10 @@ export class TUI extends Container {
 		}
 
 		this.terminal.showCursor();
+		// Restore the terminal's default cursor style (DECSCUSR 0 q) and color
+		// (OSC 12) — the app may have switched to a blinking block while running.
+		this.terminal.write("\x1b[0 q");
+		this.terminal.write("\x1b]12;\x07");
 		this.terminal.stop();
 	}
 
@@ -1991,6 +2007,11 @@ export class TUI extends Container {
 
 		this.hardwareCursorRow = targetRow;
 		if (this.showHardwareCursor) {
+			// Blinking block cursor (DECSCUSR 1 q), matching opentui/grok.
+			if (this.cursorColor !== undefined) {
+				this.terminal.write(`\x1b]12;${this.cursorColor}\x07`);
+			}
+			this.terminal.write("\x1b[1 q");
 			this.terminal.showCursor();
 		} else {
 			this.terminal.hideCursor();

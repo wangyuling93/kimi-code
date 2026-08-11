@@ -702,7 +702,11 @@ export class Editor implements Component, Focusable {
 		// Emit hardware cursor marker when focused so TUI can position the
 		// hardware cursor for IME candidate-window placement even while
 		// autocomplete (e.g. slash-command menu) is visible.
-		const emitCursorMarker = this.focused;
+		// Hide the caret while a selection is active (opencode-style): the
+		// selection highlight replaces the caret, and a blinking block in the
+		// middle of it would be noise. The marker drives hardware cursor
+		// positioning, so omitting it hides the cursor.
+		const emitCursorMarker = this.focused && !this.selectionActive();
 
 		const SELECTION_INVERSE = "\x1b[7m";
 		const SELECTION_RESET = "\x1b[0m";
@@ -761,6 +765,11 @@ export class Editor implements Component, Focusable {
 				if (cursorInsideSelection) {
 					// The character is already highlighted by the selection;
 					// keep it visible and just anchor the hardware cursor.
+					displayText = before + marker + after;
+				} else if (this.tui.getShowHardwareCursor()) {
+					// The hardware cursor renders the caret (blinking block);
+					// only emit the positioning marker so it lands on the
+					// right cell — no static inverse-video block.
 					displayText = before + marker + after;
 				} else if (after.length > 0) {
 					// Cursor is on a character (grapheme) - replace it with highlighted version
