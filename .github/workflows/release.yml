@@ -56,6 +56,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # "Sync fork" merges bring upstream changesets in without conflict markers,
+      # and upstream changesets reference @moonshot-ai/kimi-code — a package that
+      # does not exist in this fork (renamed to @vyl/kimi-code), which makes
+      # `changeset version` fail. Rewrite the bump targets in place before
+      # changesets/action consumes them. Idempotent; no commit needed here — the
+      # version step commits the whole working tree to the release branch.
+      - name: Rewrite changeset package references to the fork identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's/"@moonshot-ai\/kimi-code"/"@vyl\/kimi-code"/g' .changeset/*.md
+          if git diff --quiet -- .changeset/; then
+            echo "No changeset rewrites needed"
+          else
+            echo "Rewrote @moonshot-ai/kimi-code references in:"
+            git diff --name-only -- .changeset/
+          fi
+
       - name: Generate Kimi Code built-in catalog
         shell: bash
         run: |
