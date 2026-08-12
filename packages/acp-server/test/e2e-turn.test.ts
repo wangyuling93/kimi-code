@@ -9,7 +9,7 @@
  * `assistant.delta` → ACP `session/update` translation, and turn settlement.
  */
 
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,7 +22,6 @@ import { createTestClient, type TestClient } from './_helpers/acpClient';
 import { writeFakeModelConfig } from './_helpers/fakeModelConfig';
 import { solidPngBase64 } from './_helpers/png';
 import { createScriptedProvider, type ScriptedProvider } from './_helpers/scriptedProvider';
-import { rmrf } from './_helpers/rmrf';
 
 /** Real stdio MCP fixture server from the agent-core-v2 test suite. */
 const STDIO_MCP_FIXTURE = fileURLToPath(
@@ -40,7 +39,7 @@ describe('acp-server real prompt turn (scripted LLM)', () => {
       client = undefined;
     }
     if (homeDir !== undefined) {
-      await rmrf(homeDir);
+      await rm(homeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       homeDir = undefined;
     }
   });
@@ -563,7 +562,7 @@ describe('acp-server prompt error hygiene', () => {
       client = undefined;
     }
     if (homeDir !== undefined) {
-      await rmrf(homeDir);
+      await rm(homeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       homeDir = undefined;
     }
   });
@@ -610,7 +609,7 @@ describe('acp-server builtin slash commands (local execution, no LLM turn)', () 
       client = undefined;
     }
     if (homeDir !== undefined) {
-      await rmrf(homeDir);
+      await rm(homeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       homeDir = undefined;
     }
   });
@@ -827,7 +826,7 @@ describe('acp-server terminal reverse-RPC (clientCapabilities.terminal)', () => 
       client = undefined;
     }
     if (homeDir !== undefined) {
-      await rmrf(homeDir);
+      await rm(homeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       homeDir = undefined;
     }
   });

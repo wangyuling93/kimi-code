@@ -1,5 +1,7 @@
 # @moonshot-ai/kimi-code
 
+# @moonshot-ai/kimi-code
+
 ## 0.35.0
 
 ### Minor Changes
@@ -8,9 +10,49 @@
 
 - [`40c4f49`](https://github.com/wangyuling93/kimi-code/commit/40c4f495022e959122785c63686ce2400cfdf4ca) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Support mouse input in the message box: click to place the cursor and drag to select text. Deleting or typing replaces the selected text.
 
+- [#2816](https://github.com/MoonshotAI/kimi-code/pull/2816) [`ad12ad8`](https://github.com/MoonshotAI/kimi-code/commit/ad12ad8a140d24051d93ec98a4a6921ab33723ff) Thanks [@liruifengv](https://github.com/liruifengv)! - Show the live work progress of background subagents in the `/tasks` panel.
+
+- [#2840](https://github.com/MoonshotAI/kimi-code/pull/2840) [`68ce3c7`](https://github.com/MoonshotAI/kimi-code/commit/68ce3c7a0ccffe32b51d4fdb57cdeced3931ddcc) Thanks [@wbxl2000](https://github.com/wbxl2000)! - web: Image and video tool results now open in a fullscreen preview on click, with zoom support for images.
+
 ### Patch Changes
 
 - [`fa0660f`](https://github.com/wangyuling93/kimi-code/commit/fa0660f27262520c3c39aade5de6f1faec6b100f) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Show the message box caret as a theme-colored blinking block cursor, hidden while text is selected.
+
+- [#2840](https://github.com/MoonshotAI/kimi-code/pull/2840) [`68ce3c7`](https://github.com/MoonshotAI/kimi-code/commit/68ce3c7a0ccffe32b51d4fdb57cdeced3931ddcc) Thanks [@wbxl2000](https://github.com/wbxl2000)! - web: Reduce UI stutter while AI responses stream in long sessions.
+
+- [#2810](https://github.com/MoonshotAI/kimi-code/pull/2810) [`64abebc`](https://github.com/MoonshotAI/kimi-code/commit/64abebc95a13b066fefc4f96b062824ea5ec996b) Thanks [@huangzheng2016](https://github.com/huangzheng2016)! - Fix multi-select "Other" options so they can be deselected after being committed.
+
+- [#2814](https://github.com/MoonshotAI/kimi-code/pull/2814) [`158c81d`](https://github.com/MoonshotAI/kimi-code/commit/158c81d7055587d582ca424f9b913426fca42559) Thanks [@huangzheng2016](https://github.com/huangzheng2016)! - Show a clear error message on Windows when Git for Windows is not installed, instead of exiting silently.
+
+- [#2838](https://github.com/MoonshotAI/kimi-code/pull/2838) [`e5be391`](https://github.com/MoonshotAI/kimi-code/commit/e5be39164b1b47d0b721aad49c41fdf4ec61a7c5) Thanks [@sailist](https://github.com/sailist)! - Close a Windows binary-planting gap in the footer git status: the git and gh commands used for the branch/dirty badge are now resolved to an absolute PATH location, so an executable planted in an untrusted workspace can no longer run before the workspace trust prompt.
+
+- [#2840](https://github.com/MoonshotAI/kimi-code/pull/2840) [`68ce3c7`](https://github.com/MoonshotAI/kimi-code/commit/68ce3c7a0ccffe32b51d4fdb57cdeced3931ddcc) Thanks [@wbxl2000](https://github.com/wbxl2000)! - web: Add hover tooltips to icon-only buttons.
+
+- [#2840](https://github.com/MoonshotAI/kimi-code/pull/2840) [`68ce3c7`](https://github.com/MoonshotAI/kimi-code/commit/68ce3c7a0ccffe32b51d4fdb57cdeced3931ddcc) Thanks [@wbxl2000](https://github.com/wbxl2000)! - web: Add breathing room around the fullscreen image preview so images no longer touch the screen edges.
+
+- [#2840](https://github.com/MoonshotAI/kimi-code/pull/2840) [`68ce3c7`](https://github.com/MoonshotAI/kimi-code/commit/68ce3c7a0ccffe32b51d4fdb57cdeced3931ddcc) Thanks [@wbxl2000](https://github.com/wbxl2000)! - web: Unify the fullscreen image and video previews with a shared circular close button and the same background overlay.
+
+- [#2826](https://github.com/MoonshotAI/kimi-code/pull/2826) [`3c9e3b2`](https://github.com/MoonshotAI/kimi-code/commit/3c9e3b297cf5286c761159c1b4d642c478fd394d) Thanks [@liruifengv](https://github.com/liruifengv)! - Page the /sessions picker list so it opens fast with large session counts.
+
+- [#2840](https://github.com/MoonshotAI/kimi-code/pull/2840) [`68ce3c7`](https://github.com/MoonshotAI/kimi-code/commit/68ce3c7a0ccffe32b51d4fdb57cdeced3931ddcc) Thanks [@wbxl2000](https://github.com/wbxl2000)! - web: Widen the sidebar's minimum draggable width.
+
+- [#2723](https://github.com/MoonshotAI/kimi-code/pull/2723) [`e702817`](https://github.com/MoonshotAI/kimi-code/commit/e7028171244789aff58f93da80d477ce3afc939a) Thanks [@sailist](https://github.com/sailist)! - Fix a spurious "Failed to steer" error when sending a message while a goal run is between turns.
+
+- [#2840](https://github.com/MoonshotAI/kimi-code/pull/2840) [`68ce3c7`](https://github.com/MoonshotAI/kimi-code/commit/68ce3c7a0ccffe32b51d4fdb57cdeced3931ddcc) Thanks [@wbxl2000](https://github.com/wbxl2000)! - web: Reduce memory and CPU usage when the app stays open for a long time.
+
+- [#2825](https://github.com/MoonshotAI/kimi-code/pull/2825) [`df8ce73`](https://github.com/MoonshotAI/kimi-code/commit/df8ce73e45e3c473cb58e69311c1213e327f0c01) Thanks [@liruifengv](https://github.com/liruifengv)! - Show retry progress in the loading indicator when a model request fails and is retried, with the attempt count and a detail line for the provider error.
+
+- [#2840](https://github.com/MoonshotAI/kimi-code/pull/2840) [`68ce3c7`](https://github.com/MoonshotAI/kimi-code/commit/68ce3c7a0ccffe32b51d4fdb57cdeced3931ddcc) Thanks [@wbxl2000](https://github.com/wbxl2000)! - web: Reduce memory usage and stutter during long sessions.
+
+- [#2837](https://github.com/MoonshotAI/kimi-code/pull/2837) [`101c4d1`](https://github.com/MoonshotAI/kimi-code/commit/101c4d199746bf2ed4f26375b65a6fcb6cba2a60) Thanks [@sailist](https://github.com/sailist)! - Remove the Agent and AgentSwarm tools from the built-in coder subagent profile, so coder subagents no longer delegate further by default. Custom profiles that list these tools explicitly can still opt in.
+
+- [#2695](https://github.com/MoonshotAI/kimi-code/pull/2695) [`71ff2a0`](https://github.com/MoonshotAI/kimi-code/commit/71ff2a0fffb2ebf399194436ef2d4b599c9988ad) Thanks [@sailist](https://github.com/sailist)! - Fix a Windows security risk where commands launched before the workspace trust prompt could run a malicious executable placed in the current folder.
+
+- [#2813](https://github.com/MoonshotAI/kimi-code/pull/2813) [`619564d`](https://github.com/MoonshotAI/kimi-code/commit/619564dcf9ee10a3cfbf7ecbc764c6b9b63fc91b) Thanks [@wbxl2000](https://github.com/wbxl2000)! - Fix the web UI repeatedly losing its realtime connection every ~30 seconds when the server runs behind a reverse proxy or gateway with an idle connection timeout; the server now sends a WebSocket heartbeat and only closes connections that stop responding entirely.
+
+- [#2842](https://github.com/MoonshotAI/kimi-code/pull/2842) [`e476c5a`](https://github.com/MoonshotAI/kimi-code/commit/e476c5a8bbe68fb0b6eb0096aa1efcb893b1a8fc) Thanks [@wbxl2000](https://github.com/wbxl2000)! - Add the Modern Web Guidance plugin to the bundled plugin marketplace. Run /plugins and select Modern Web Guidance to install it.
+
+- Thanks [@Leakless](https://github.com/Leakless) and [@winmin](https://github.com/winmin) for reporting the Windows binary-planting issues fixed in this release.
 
 ## 0.34.1
 

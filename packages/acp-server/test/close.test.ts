@@ -1,11 +1,10 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createTestClient, type TestClient } from './_helpers/acpClient';
-import { rmrf } from './_helpers/rmrf';
 
 describe('acp-server session/close', () => {
   let homeDir: string | undefined;
@@ -17,7 +16,7 @@ describe('acp-server session/close', () => {
       client = undefined;
     }
     if (homeDir !== undefined) {
-      await rmrf(homeDir);
+      await rm(homeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       homeDir = undefined;
     }
   });

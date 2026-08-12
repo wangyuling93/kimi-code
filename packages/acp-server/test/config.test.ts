@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { AcpSession } from '../src/session';
 import { createTestClient, type TestClient } from './_helpers/acpClient';
 import { FAKE_MODEL_ALT_ID, writeFakeModelConfig } from './_helpers/fakeModelConfig';
-import { rmrf } from './_helpers/rmrf';
 
 interface ConfigOption {
   readonly id: string;
@@ -36,7 +35,7 @@ describe('acp-server config surface', () => {
       client = undefined;
     }
     if (homeDir !== undefined) {
-      await rmrf(homeDir);
+      await rm(homeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       homeDir = undefined;
     }
   });

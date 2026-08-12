@@ -1,4 +1,4 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Readable, Writable } from 'node:stream';
@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 
 import { runAcpServerWithStream } from '../src/start';
 import { CURRENT_VERSION, MIN_PROTOCOL_VERSION, negotiateVersion } from '../src/version';
-import { rmrf } from './_helpers/rmrf';
 
 interface JsonRpcMessage {
   readonly jsonrpc?: string;
@@ -93,7 +92,7 @@ describe('acp-server initialize handshake', () => {
         toAgent.end();
         toClient.end();
       } finally {
-        await rmrf(homeDir);
+        await rm(homeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     },
     30_000,
@@ -126,7 +125,7 @@ describe('acp-server initialize handshake', () => {
         toAgent.end();
         toClient.end();
       } finally {
-        await rmrf(homeDir);
+        await rm(homeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     },
     30_000,
@@ -177,7 +176,7 @@ describe('acp-server initialize handshake', () => {
         toAgent.end();
         toClient.end();
       } finally {
-        await rmrf(homeDir);
+        await rm(homeDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
       }
     },
     30_000,
