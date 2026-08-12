@@ -1,5 +1,21 @@
 # @moonshot-ai/kimi-code
 
+## 0.36.0
+
+### Minor Changes
+
+- [#2830](https://github.com/MoonshotAI/kimi-code/pull/2830) [`ec84a6f`](https://github.com/wangyuling93/kimi-code/commit/ec84a6f9a3eb35e1118f8a327f7a11b3978a899c) Thanks [@liruifengv](https://github.com/liruifengv)! - Add an experimental fullscreen TUI mode. Set the `KIMI_CODE_TUI_FULL_SCREEN=1` environment variable to enable it.
+
+### Patch Changes
+
+- [#2830](https://github.com/MoonshotAI/kimi-code/pull/2830) [`ec84a6f`](https://github.com/wangyuling93/kimi-code/commit/ec84a6f9a3eb35e1118f8a327f7a11b3978a899c) Thanks [@liruifengv](https://github.com/liruifengv)! - Render LaTeX math formulas (`$…$` / `$$…$$`) in messages as Unicode formulas.
+
+- [#2847](https://github.com/MoonshotAI/kimi-code/pull/2847) [`3b0936d`](https://github.com/wangyuling93/kimi-code/commit/3b0936d8e025c5a944759c40593d5f21bfb3e621) Thanks [@sailist](https://github.com/sailist)! - Fix plain Markdown files (such as CHANGELOG.md) in an installed plugin's root directory being misidentified as skills when the plugin relies on the root SKILL.md fallback.
+
+- [#2843](https://github.com/MoonshotAI/kimi-code/pull/2843) [`c212ae9`](https://github.com/wangyuling93/kimi-code/commit/c212ae9715371c0d7939c15e664acbe0d7cf7fc3) Thanks [@sailist](https://github.com/sailist)! - Show project MCP launch targets in the workspace trust prompt, default to declining trust, and resolve fd and stty binaries to absolute paths so untrusted workspaces cannot plant bare-name executables before confirmation.
+
+  `@moonshot-ai/kimi-code-sdk` contract change: `WorkspaceTrustInfo.gatedMcpServers` now carries structured `WorkspaceTrustMcpServerInfo` records (`name`, `transport`, and `command`/`args`/`cwd` or `url`) instead of plain strings, so SDK consumers rendering a trust prompt can show the full launch target.
+
 # @moonshot-ai/kimi-code
 
 ## 0.35.0
