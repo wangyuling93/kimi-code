@@ -1,5 +1,11 @@
 # @moonshot-ai/kimi-code
 
+## 0.36.2
+
+### Patch Changes
+
+- [`05ccb42`](https://github.com/wangyuling93/kimi-code/commit/05ccb42296d5e405eb09ff4bb1e1adb3688fc760) Thanks [@wangyuling93](https://github.com/wangyuling93)! - Verify the release workflow's fork-identity rewrite: changeset package references are rewritten from the upstream package name to `@vyl/kimi-code` before the version step runs.
+
 ## 0.36.1
 
 ### Patch Changes
