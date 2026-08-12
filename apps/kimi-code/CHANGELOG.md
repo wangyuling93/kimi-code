@@ -1,5 +1,11 @@
 # @moonshot-ai/kimi-code
 
+## 0.36.3
+
+### Patch Changes
+
+- [#2819](https://github.com/MoonshotAI/kimi-code/pull/2819) [`fe3cdae`](https://github.com/wangyuling93/kimi-code/commit/fe3cdae5f8ab40be71b65eff32319eb94a53c17d) Thanks [@7Sageer](https://github.com/7Sageer)! - Fix sessions failing with a provider 400 error on every follow-up request after a turn is interrupted while the model is still thinking, on strict OpenAI-compatible providers.
+
 ## 0.36.2
 
 ### Patch Changes
