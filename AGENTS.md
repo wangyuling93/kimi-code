@@ -44,7 +44,15 @@ This is a TypeScript monorepo built for agent-assisted development. Keep the roo
   - `pnpm-workspace.yaml` uses globs (`packages/*`, `apps/*`), so most packages land there automatically; `flake.nix` is fully manual and is where omissions happen.
   - Missing a path in `flake.nix`'s `workspacePaths` will silently drop files from the Nix build's `src` fileset.
   - Missing a name in `flake.nix`'s `workspaceNames` will break `pnpmConfigHook` because dependencies for that workspace will not be fetched.
-- The automated "Check flake.nix workspace sync" (`scripts/check-nix-workspace.mjs`) only validates the transitive dependency **closure of `@moonshot-ai/kimi-code`**. A leaf package outside that closure (e.g. an e2e package nobody imports) slips through even when it is missing from `flake.nix`. A green check is therefore NOT proof that `flake.nix` is fully in sync — keep it updated by hand on every add/remove, do not rely on the check to catch omissions.
+- The automated "Check flake.nix workspace sync" (`scripts/check-nix-workspace.mjs`) only validates the transitive dependency **closure of `@vyl/kimi-code`**. A leaf package outside that closure (e.g. an e2e package nobody imports) slips through even when it is missing from `flake.nix`. A green check is therefore NOT proof that `flake.nix` is fully in sync — keep it updated by hand on every add/remove, do not rely on the check to catch omissions.
+
+## Fork Package Renaming
+
+This fork publishes the CLI under its own npm identity: the package is **`@vyl/kimi-code`** (upstream: `@moonshot-ai/kimi-code`), and the release workflow, changeset changelog repo, homepage/repository/bugs fields, and scripts all point at `wangyuling93/kimi-code` instead of `MoonshotAI/kimi-code`. Preserve this on every sync:
+
+- **Whenever code is synced from upstream, every newly-incoming file that references `@moonshot-ai/kimi-code` or `MoonshotAI/kimi-code` MUST be rewritten** to `@vyl/kimi-code` / `wangyuling93/kimi-code`. This applies to `.changeset/*.md` bump targets, scripts, workflows, docs, and package metadata. Files new on the upstream side merge cleanly with no conflict markers — git will NOT flag them, so audit them by hand.
+- **After any upstream merge, `pnpm changeset status` MUST pass.** It fails fast when a changeset references a package that is not in the workspace (the exact failure the release workflow hits), so run it before pushing to main.
+- The only packages that legitimately keep the `@moonshot-ai/*` scope are the ones upstream also owns that the fork does not rename: `@moonshot-ai/kimi-code-sdk`, `@moonshot-ai/pi-tui`, `@moonshot-ai/agent-core-v2`, and other library packages. Only `apps/kimi-code` (the CLI) is renamed.
 
 ## General Coding Rules
 
