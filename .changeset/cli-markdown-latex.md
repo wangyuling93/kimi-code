@@ -1,5 +1,5 @@
 ---
-"@moonshot-ai/kimi-code": patch
+"@vyl/kimi-code": patch
 ---
 
 Render LaTeX math formulas (`$…$` / `$$…$$`) in messages as Unicode formulas.

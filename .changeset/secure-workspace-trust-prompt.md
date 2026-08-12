@@ -1,5 +1,5 @@
 ---
-"@moonshot-ai/kimi-code": patch
+"@vyl/kimi-code": patch
 "@moonshot-ai/kimi-code-sdk": patch
 ---
 
