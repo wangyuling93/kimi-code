@@ -1,5 +1,11 @@
 # @moonshot-ai/kimi-code
 
+## 0.36.1
+
+### Patch Changes
+
+- [#2855](https://github.com/MoonshotAI/kimi-code/pull/2855) [`30f56a2`](https://github.com/wangyuling93/kimi-code/commit/30f56a2d2da332cbf0c36a13cbe01aac5d319c7b) Thanks [@liruifengv](https://github.com/liruifengv)! - Fix Ctrl+C being ignored during automatic retries of failed API requests.
+
 ## 0.36.0
 
 ### Minor Changes
