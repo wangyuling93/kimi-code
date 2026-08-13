@@ -1,6 +1,10 @@
 # @moonshot-ai/kimi-code-sdk
 
-## 0.16.1
+## 0.17.0
+
+### Minor Changes
+
+- [#2700](https://github.com/MoonshotAI/kimi-code/pull/2700) [`c9bfe8b`](https://github.com/MoonshotAI/kimi-code/commit/c9bfe8b2c8314ba4ef8806fb3b92ac654c1d1860) Thanks [@7Sageer](https://github.com/7Sageer)! - Remove the secondary-model session API `Session.applyPersistedSecondaryModel`; subagent model selection is configured via `[secondary_model]` in config.toml instead. The `SECONDARY_DERIVED_MODEL_ALIAS` export stays (the v1 engine still synthesizes the entry at runtime, so hosts keep filtering it out of model pickers), and the SDK now also exports `PRIMARY_SUBAGENT_MODEL_CHOICE`, the v2 subagent model pool's reserved `primary` key.
 
 ### Patch Changes
 
