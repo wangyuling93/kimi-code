@@ -1,5 +1,17 @@
 # @moonshot-ai/kimi-code
 
+## 0.36.5
+
+### Patch Changes
+
+- [#2865](https://github.com/MoonshotAI/kimi-code/pull/2865) [`53909d9`](https://github.com/wangyuling93/kimi-code/commit/53909d91e3ca570d4b565ba1abd00f027ca78d6b) Thanks [@weivwang](https://github.com/weivwang)! - Cache content-hashed Kimi Web assets across reloads while keeping the app entry point revalidated.
+
+- [#2910](https://github.com/MoonshotAI/kimi-code/pull/2910) [`eb72aeb`](https://github.com/wangyuling93/kimi-code/commit/eb72aebeeb972b2fcc238d5650dd991a5580f96b) Thanks [@sailist](https://github.com/sailist)! - Remove the 64 MiB limit on web session exports, so large sessions no longer fail with a file-too-large error when downloaded from the web UI.
+
+- [#2899](https://github.com/MoonshotAI/kimi-code/pull/2899) [`102984a`](https://github.com/wangyuling93/kimi-code/commit/102984aa660d752ba8dd7d1aba155575f32affe2) Thanks [@oocz](https://github.com/oocz)! - Fix MCP OAuth cancellation leaving an in-flight authorization waiting for its callback timeout.
+
+- [#2863](https://github.com/MoonshotAI/kimi-code/pull/2863) [`245e3d5`](https://github.com/wangyuling93/kimi-code/commit/245e3d56a6de45e74d55449ef26cd65304a3250a) Thanks [@LouisDM](https://github.com/LouisDM)! - Prevent background task output from disrupting terminal pane borders.
+
 ## 0.36.4
 
 ### Patch Changes
