@@ -9,9 +9,14 @@ on:
 permissions:
   contents: read
 
+# Version PRs only bump package.json / CHANGELOG — the same commits already
+# passed CI on main. Skip the heavy jobs so auto-merge is not blocked for ~4
+# minutes (or stuck in action_required). The aggregate "CI" job still runs
+# and is the required check.
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: github.head_ref != 'changeset-release/main'
 
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +35,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    if: github.head_ref != 'changeset-release/main'
     strategy:
       fail-fast: false
       matrix:
@@ -52,6 +58,7 @@ jobs:
   # does not execute it; it needs its own job.
   test-pi-tui:
     runs-on: ubuntu-latest
+    if: github.head_ref != 'changeset-release/main'
 
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +78,7 @@ jobs:
   # the extension selects through the rollback env var.
   test-vscode-legacy:
     runs-on: ubuntu-latest
+    if: github.head_ref != 'changeset-release/main'
 
     steps:
       - uses: actions/checkout@v4
@@ -110,6 +118,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    if: github.head_ref != 'changeset-release/main'
 
     steps:
       - uses: actions/checkout@v4
@@ -127,6 +136,7 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
+    if: github.head_ref != 'changeset-release/main'
 
     steps:
       - uses: actions/checkout@v4
@@ -157,6 +167,7 @@ jobs:
   # GitHub names the workflow-level check after the workflow, but the PR merge
   # machinery matches required contexts against job names here, so an explicit
   # job named CI is needed for the required check to be satisfiable.
+  # Skipped children (version PRs) are success — only failure/cancelled fail.
   CI:
     runs-on: ubuntu-latest
     needs: [build, test, test-pi-tui, lint, typecheck]

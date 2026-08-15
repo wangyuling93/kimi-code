@@ -16,6 +16,7 @@ jobs:
   check-workspace-sync:
     name: Check flake.nix workspace sync
     runs-on: ubuntu-latest
+    if: github.head_ref != 'changeset-release/main'
 
     steps:
       - name: Checkout
@@ -90,6 +91,7 @@ jobs:
     name: nix build .#kimi-code
     needs: check-workspace-sync
     runs-on: ubuntu-latest
+    if: github.head_ref != 'changeset-release/main'
 
     steps:
       - name: Checkout
