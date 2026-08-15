@@ -4,14 +4,18 @@ on:
   push:
     branches:
       - main
-  # The version PR is merged via auto-merge, which does not emit a push event;
-  # fire the release from the merge's pull_request closed event instead.
+  # Fallback only: a GITHUB_TOKEN merge of the version PR does not emit push.
+  # PAT merges (the usual path) already fire the push event above — do not
+  # also handle those here or two publishes race.
   pull_request:
     types: [closed]
     branches:
       - main
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+# One publish at a time. Do not cancel an in-flight npm publish.
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -22,7 +26,8 @@ jobs:
       (github.event_name == 'push' ||
        (github.event_name == 'pull_request' &&
         github.event.pull_request.merged == true &&
-        github.event.pull_request.head.ref == 'changeset-release/main'))
+        github.event.pull_request.head.ref == 'changeset-release/main' &&
+        github.event.pull_request.merged_by.login == 'github-actions[bot]'))
     outputs:
       packages_published: ${{ steps.changesets.outputs.published }}
       kimi_native_release: ${{ steps.kimi-release.outputs.should_publish }}
@@ -39,11 +44,48 @@ jobs:
           # On pull_request (closed) events the checkout defaults to the PR
           # merge ref; always base the release on main's post-merge state.
           ref: main
+          # checkout's default extraheader uses the job GITHUB_TOKEN and beats
+          # changesets/action's .netrc PAT, so version-PR updates are pushed
+          # as github-actions[bot] and CI sits in action_required. Leave
+          # credentials unset; the action writes .netrc from CHANGESETS_TOKEN.
+          persist-credentials: false
+
+      - name: Detect release mode
+        id: mode
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          has_changesets=false
+          if find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | grep -q .; then
+            has_changesets=true
+          fi
+
+          is_release_merge=false
+          subject=$(git log -1 --format=%s)
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            is_release_merge=true
+          elif [[ "$subject" == *"changeset-release/main"* ]]; then
+            is_release_merge=true
+          elif [ "$subject" = "ci: release packages" ]; then
+            is_release_merge=true
+          fi
+
+          if [ "$has_changesets" = true ]; then
+            echo "mode=version" >> "$GITHUB_OUTPUT"
+          elif [ "$is_release_merge" = true ]; then
+            echo "mode=publish" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=skip" >> "$GITHUB_OUTPUT"
+          fi
+          echo "mode has_changesets=$has_changesets is_release_merge=$is_release_merge subject=$subject"
 
       - name: Setup pnpm
+        if: steps.mode.outputs.mode != 'skip'
         uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
+        if: steps.mode.outputs.mode != 'skip'
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
@@ -51,12 +93,15 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Upgrade npm for Trusted Publishing
+        if: steps.mode.outputs.mode == 'publish'
         run: npm install -g npm@11
 
       - name: Install dependencies
+        if: steps.mode.outputs.mode != 'skip'
         run: pnpm install --frozen-lockfile
 
       - name: Generate Kimi Code built-in catalog
+        if: steps.mode.outputs.mode == 'publish'
         shell: bash
         run: |
           CATALOG_FILE="$RUNNER_TEMP/kimi-code-built-in-catalog.json"
@@ -64,16 +109,19 @@ jobs:
           echo "KIMI_CODE_BUILT_IN_CATALOG_FILE=$CATALOG_FILE" >> "$GITHUB_ENV"
 
       - name: Build packages
+        if: steps.mode.outputs.mode == 'publish'
         run: pnpm build
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
+        if: steps.mode.outputs.mode != 'skip'
         uses: changesets/action@v1
         with:
           publish: pnpm changeset publish
           version: pnpm run version:release
           commit: "ci: release packages"
           title: "ci: release packages"
+          commitMode: git-cli
           # Use the maintainer's PAT so the version PR is authored by a real
           # account: PRs created by github-actions[bot] always require manual
           # workflow approval (the bot has no contribution history), which
@@ -93,7 +141,7 @@ jobs:
       # branch protection requiring status checks); changesets/action has no
       # such input of its own.
       - name: Enable auto-merge on the version PR
-        if: steps.changesets.outputs.pullRequestNumber != ''
+        if: steps.mode.outputs.mode != 'skip' && steps.changesets.outputs.pullRequestNumber != ''
         run: gh pr merge --repo "$GITHUB_REPOSITORY" --merge --auto "${{ steps.changesets.outputs.pullRequestNumber }}"
         env:
           # Auto-merge with the maintainer's PAT: merges performed with the
