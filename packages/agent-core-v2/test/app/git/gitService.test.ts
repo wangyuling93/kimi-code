@@ -1,9 +1,21 @@
+/**
+ * Scenario: GitService status / diff / findWorkTree against a real temp repo.
+ * Responsibility: porcelain + numstat + work-tree discovery, and folding
+ *   `gh pr view` into status().
+ * Wiring: real HostProcessService + HostFileSystem for git/fs. `gh` is stubbed
+ *   at the process boundary — CI images ship `gh`, and the first `pr view`
+ *   can sit until GitService's 5s spawn timeout, racing vitest's 5s default.
+ * Run: pnpm --filter @moonshot-ai/agent-core-v2 test -- test/app/git/gitService.test.ts
+ */
+
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable, Writable } from 'node:stream';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { normalize } from 'pathe';
 
 import { DisposableStore } from '#/_base/di/lifecycle';
 import { createServices, type TestInstantiationService } from '#/_base/di/test';
@@ -14,8 +26,10 @@ import { ErrorCodes } from '#/errors';
 import { HostFileSystem } from '#/os/backends/node-local/hostFsService';
 import { HostProcessService } from '#/os/backends/node-local/hostProcessService';
 import { IHostFileSystem } from '#/os/interface/hostFileSystem';
-import { IHostProcessService } from '#/os/interface/hostProcess';
-import { normalize } from 'pathe';
+import {
+  IHostProcessService,
+  type IHostProcess,
+} from '#/os/interface/hostProcess';
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, {
@@ -27,11 +41,44 @@ function git(cwd: string, ...args: string[]): string {
     .trim();
 }
 
+function fakeProcess(code: number, stdout = '', stderr = ''): IHostProcess {
+  return {
+    _serviceBrand: undefined,
+    pid: 1,
+    exitCode: code,
+    stdin: new Writable({
+      write(_chunk, _encoding, callback) {
+        callback();
+      },
+    }),
+    stdout: Readable.from([stdout]),
+    stderr: Readable.from([stderr]),
+    wait: () => Promise.resolve(code),
+    kill: () => Promise.resolve(),
+    dispose: () => undefined,
+  };
+}
+
+function hostProcessWithStubbedGh(state: { reply: { stdout: string; code: number }; calls: number }): IHostProcessService {
+  const inner = new HostProcessService();
+  return {
+    _serviceBrand: undefined,
+    async spawn(command, args, options) {
+      if (command === 'gh') {
+        state.calls += 1;
+        return fakeProcess(state.reply.code, state.reply.stdout);
+      }
+      return inner.spawn(command, args, options);
+    },
+  };
+}
+
 describe('GitService', () => {
   let repo: string;
   let disposables: DisposableStore;
   let ix: TestInstantiationService;
   let service: IGitService;
+  let gh: { reply: { stdout: string; code: number }; calls: number };
 
   beforeEach(() => {
     repo = mkdtempSync(join(tmpdir(), 'git-service-'));
@@ -39,10 +86,11 @@ describe('GitService', () => {
     git(repo, 'config', 'user.email', 'test@example.com');
     git(repo, 'config', 'user.name', 'Test');
     git(repo, 'config', 'commit.gpgsign', 'false');
+    gh = { reply: { stdout: '', code: 1 }, calls: 0 };
     disposables = new DisposableStore();
     ix = createServices(disposables, {
       additionalServices: (reg) => {
-        reg.define(IHostProcessService, HostProcessService);
+        reg.defineInstance(IHostProcessService, hostProcessWithStubbedGh(gh));
         reg.define(IHostFileSystem, HostFileSystem);
         reg.define(IGitService, GitService);
       },
@@ -104,6 +152,43 @@ describe('GitService', () => {
       } finally {
         rmSync(notRepo, { recursive: true, force: true });
       }
+    });
+
+    it('returns a normalized pull request when gh pr view succeeds', async () => {
+      writeFileSync(join(repo, 'a.txt'), 'hello\n');
+      commitAll('init');
+      gh.reply = {
+        stdout: '{"number":12,"url":"https://github.com/acme/repo/pull/12","state":"OPEN"}\n',
+        code: 0,
+      };
+
+      const result = await service.status(repo);
+      expect(result.pullRequest).toEqual({
+        number: 12,
+        state: 'open',
+        url: 'https://github.com/acme/repo/pull/12',
+      });
+    });
+
+    it('caches the pull request lookup on a second status of the same cwd', async () => {
+      writeFileSync(join(repo, 'a.txt'), 'hello\n');
+      commitAll('init');
+      gh.reply = {
+        stdout: '{"number":1,"url":"https://github.com/acme/repo/pull/1","state":"MERGED"}\n',
+        code: 0,
+      };
+
+      const first = await service.status(repo);
+      gh.reply = { stdout: '', code: 1 };
+      const second = await service.status(repo);
+
+      expect(first.pullRequest).toEqual({
+        number: 1,
+        state: 'merged',
+        url: 'https://github.com/acme/repo/pull/1',
+      });
+      expect(second.pullRequest).toEqual(first.pullRequest);
+      expect(gh.calls).toBe(1);
     });
   });
 
