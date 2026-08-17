@@ -1,5 +1,12 @@
 # @moonshot-ai/acp-adapter
 
+## 0.3.10
+
+### Patch Changes
+
+- Updated dependencies [[`d833a1a`](https://github.com/wangyuling93/kimi-code/commit/d833a1a893c4d69d96af542f40557442992085e0), [`61591bc`](https://github.com/wangyuling93/kimi-code/commit/61591bce09f4467aa1664cb8ecb6aa6904b7accd), [`d833a1a`](https://github.com/wangyuling93/kimi-code/commit/d833a1a893c4d69d96af542f40557442992085e0), [`59dde73`](https://github.com/wangyuling93/kimi-code/commit/59dde734f37596db5c77794060f81bfb3c1dbeb6)]:
+  - @moonshot-ai/kimi-code-sdk@0.19.0
+
 ## 0.3.9
 
 ### Patch Changes
