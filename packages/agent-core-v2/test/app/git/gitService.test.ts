@@ -3,8 +3,9 @@
  * Responsibility: porcelain + numstat + work-tree discovery, and folding
  *   `gh pr view` into status().
  * Wiring: real HostProcessService + HostFileSystem for git/fs. `gh` is stubbed
- *   at the process boundary — CI images ship `gh`, and the first `pr view`
- *   can sit until GitService's 5s spawn timeout, racing vitest's 5s default.
+ *   on the workspace runtime process (the spawn path GitService uses) — CI
+ *   images ship `gh`, and the first `pr view` can sit until GitService's 5s
+ *   spawn timeout, racing vitest's 5s default.
  * Run: pnpm --filter @moonshot-ai/agent-core-v2 test -- test/app/git/gitService.test.ts
  */
 
@@ -91,11 +92,10 @@ describe('GitService', () => {
     git(repo, 'config', 'commit.gpgsign', 'false');
     gh = { reply: { stdout: '', code: 1 }, calls: 0 };
     disposables = new DisposableStore();
-    const process = new HostProcessService();
-    const runtime = { process } as unknown as Runtime;
+    const runtime = { process: hostProcessWithStubbedGh(gh) } as unknown as Runtime;
     ix = createServices(disposables, {
       additionalServices: (reg) => {
-        reg.defineInstance(IHostProcessService, hostProcessWithStubbedGh(gh));
+        reg.define(IHostProcessService, HostProcessService);
         reg.define(IHostFileSystem, HostFileSystem);
         reg.defineInstance(IRuntimeResolver, {
           _serviceBrand: undefined,
