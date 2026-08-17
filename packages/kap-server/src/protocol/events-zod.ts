@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { isoDateTimeSchema } from '@moonshot-ai/agent-core-v2/_base/utils/isoDateTime';
 import type { TurnEndReason } from '@moonshot-ai/agent-core-v2/agent/loop/turnEvents';
 import type {
+  BundledSkillActivation,
   CompactionSummaryOrigin,
   CronJobOrigin,
   CronMissedOrigin,
@@ -119,8 +120,18 @@ export const permissionModeSchema = z.enum(['manual', 'yolo', 'auto']) satisfies
 
 export const skillSourceSchema = z.enum(['project', 'user', 'extra', 'builtin']) satisfies z.ZodType<SkillSource>;
 
+export const bundledSkillActivationSchema = z.object({
+  activationId: z.string(),
+  skillName: z.string(),
+  skillArgs: z.string().optional(),
+  skillType: z.string().optional(),
+  skillPath: z.string().optional(),
+  skillSource: skillSourceSchema.optional(),
+}) satisfies z.ZodType<BundledSkillActivation>;
+
 export const userPromptOriginSchema = z.object({
   kind: z.literal('user'),
+  skillActivations: z.array(bundledSkillActivationSchema).optional(),
 }) satisfies z.ZodType<UserPromptOrigin>;
 
 export const skillActivationOriginSchema = z.object({
@@ -368,6 +379,7 @@ export const kimiErrorCodeSchema = z.enum([
   'request.invalid',
   'request.work_dir_required',
   'request.prompt_input_empty',
+  'prompt.id_conflict',
   'prompt.not_found',
   'prompt.already_completed',
   'session.busy',
@@ -692,6 +704,7 @@ export const turnStartedEventSchema = z.object({
   turnId: z.number(),
   origin: promptOriginSchema,
   prompt: z.string().optional(),
+  promptId: z.string().optional(),
 });
 
 export const turnEndedEventSchema = z.object({

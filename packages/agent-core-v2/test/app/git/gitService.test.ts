@@ -26,10 +26,13 @@ import { ErrorCodes } from '#/errors';
 import { HostFileSystem } from '#/os/backends/node-local/hostFsService';
 import { HostProcessService } from '#/os/backends/node-local/hostProcessService';
 import { IHostFileSystem } from '#/os/interface/hostFileSystem';
+import { Event } from '#/_base/event';
 import {
   IHostProcessService,
   type IHostProcess,
 } from '#/os/interface/hostProcess';
+import type { Runtime } from '#/runtime/runtime';
+import { IRuntimeResolver, IWorkspaceInstanceManager, type WorkspaceInstanceChange } from '#/workspace/workspaceInstance/workspaceInstanceManager';
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, {
@@ -88,10 +91,21 @@ describe('GitService', () => {
     git(repo, 'config', 'commit.gpgsign', 'false');
     gh = { reply: { stdout: '', code: 1 }, calls: 0 };
     disposables = new DisposableStore();
+    const process = new HostProcessService();
+    const runtime = { process } as unknown as Runtime;
     ix = createServices(disposables, {
       additionalServices: (reg) => {
         reg.defineInstance(IHostProcessService, hostProcessWithStubbedGh(gh));
         reg.define(IHostFileSystem, HostFileSystem);
+        reg.defineInstance(IRuntimeResolver, {
+          _serviceBrand: undefined,
+          inspect: () => runtime,
+          acquire: () => ({ runtime, track: (resource) => resource, dispose: () => {} }),
+        });
+        reg.definePartialInstance(IWorkspaceInstanceManager, {
+          findByRoot: () => ({ id: 'workspace-1' } as never),
+          onDidChange: Event.None as Event<WorkspaceInstanceChange>,
+        });
         reg.define(IGitService, GitService);
       },
     });

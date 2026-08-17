@@ -20,8 +20,10 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  buildDaemonFileUrl,
   createKimiHarnessV2,
   ErrorCodes,
+  isDaemonFileUrl,
   KimiHarness,
   removeProviderFromConfig,
   SDKRpcClientV2,
@@ -34,8 +36,7 @@ import {
   drainSessionIndexMirror,
   HostProcessError,
   IHostRequestHeaders,
-  ISessionLifecycleService,
-  IWorkspaceLifecycleService,
+  ISessionManager,
   OsProcessErrors,
 } from '@moonshot-ai/agent-core-v2';
 
@@ -72,7 +73,7 @@ afterEach(async () => {
   await drainSessionIndexMirror();
   await drainQueryStoreDisposals();
   for (const dir of tempDirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   }
 });
 
@@ -112,6 +113,22 @@ async function sessionDirExists(homeDir: string, sessionId: string): Promise<boo
 }
 
 describe('SDKRpcClientV2 (agent-core-v2 wiring)', () => {
+  it('exposes the validated runtime binding through Session', async () => {
+    const { harness } = await makeHarness();
+    const workDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-work-'));
+    tempDirs.push(workDir);
+    const session = await harness.createSession({ id: 'ses_runtime', workDir });
+    try {
+      const binding = await session.getRuntime();
+      expect(binding.runtimeId).toBe('local');
+      expect(binding.workspaceId.length).toBeGreaterThan(0);
+      await expect(session.switchRuntime('missing-runtime')).rejects.toThrow(/missing-runtime/);
+      expect(await session.getRuntime()).toEqual(binding);
+    } finally {
+      await harness.close();
+    }
+  });
+
   it('reports global MCP authorization from the persisted v2 credential store', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-'));
     tempDirs.push(homeDir);
@@ -257,6 +274,32 @@ describe('SDKRpcClientV2 (agent-core-v2 wiring)', () => {
         expect(typeof feature.enabled).toBe('boolean');
         expect(typeof feature.defaultEnabled).toBe('boolean');
       }
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it('uploadFile stores bytes through the klient files facade', async () => {
+    const { harness } = await makeHarness();
+    try {
+      const bytes = new Uint8Array([137, 80, 78, 71]);
+      const meta = await harness.uploadFile(bytes, {
+        name: 'pixel.png',
+        mimeType: 'image/png',
+        expiresInSec: 60,
+      });
+      expect(meta.id.startsWith('f_')).toBe(true);
+      expect(meta.name).toBe('pixel.png');
+      expect(meta.media_type).toBe('image/png');
+      expect(meta.size).toBe(bytes.length);
+      expect(typeof meta.created_at).toBe('string');
+      expect(typeof meta.expires_at).toBe('string');
+
+      // Re-export smoke only — helper behavior is pinned by agent-core-v2's
+      // mediaRef tests.
+      expect(isDaemonFileUrl(buildDaemonFileUrl(meta.id))).toBe(true);
+      await harness.deleteFile(meta.id);
+      await expect(harness.deleteFile(meta.id)).rejects.toThrow(/file not found/);
     } finally {
       await harness.close();
     }
@@ -447,10 +490,8 @@ key = "${titleOAuthRef.key}"
       // lands while the close is still in flight.
       const titlePromise = client.generateSessionTitle({ id: 'ses_title_race' });
       await fetchStarted;
-      const handler = await client.engineAccessor
-        .get(IWorkspaceLifecycleService)
-        .handlerFor({ root: workDir });
-      const tempHandle = handler.accessor.get(ISessionLifecycleService).get('ses_title_race');
+      const sessionManager = client.engineAccessor.get(ISessionManager);
+      const tempHandle = sessionManager.get('ses_title_race');
       expect(tempHandle).toBeDefined();
       let markCloseStarted!: () => void;
       let openCloseGate!: () => void;
@@ -460,7 +501,7 @@ key = "${titleOAuthRef.key}"
       const closeGate = new Promise<void>((resolve) => {
         openCloseGate = resolve;
       });
-      handler.accessor.get(ISessionLifecycleService).onWillCloseSession((event) => {
+      sessionManager.onWillCloseSession!((event) => {
         if (event.sessionId !== 'ses_title_race') return;
         markCloseStarted();
         event.waitUntil(closeGate);

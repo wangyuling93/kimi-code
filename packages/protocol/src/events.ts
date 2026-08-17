@@ -45,6 +45,22 @@ export type SkillSource = 'project' | 'user' | 'extra' | 'builtin';
 
 export interface UserPromptOrigin {
   readonly kind: 'user';
+  /**
+   * Skill activations bundled into this prompt: the rendered skill blocks
+   * precede the caller's parts in the message content, and every activation
+   * is listed here so resume / replay can rebuild the per-skill view from
+   * the single bundled message.
+   */
+  readonly skillActivations?: readonly BundledSkillActivation[];
+}
+
+export interface BundledSkillActivation {
+  readonly activationId: string;
+  readonly skillName: string;
+  readonly skillArgs?: string;
+  readonly skillType?: string;
+  readonly skillPath?: string;
+  readonly skillSource?: SkillSource;
 }
 
 export interface SkillActivationOrigin {
@@ -294,6 +310,7 @@ export type KimiErrorCode =
   | 'request.invalid'
   | 'request.work_dir_required'
   | 'request.prompt_input_empty'
+  | 'prompt.id_conflict'
   | 'prompt.not_found'
   | 'prompt.already_completed'
   | 'session.busy'
@@ -655,6 +672,8 @@ export interface TurnStartedEvent {
   readonly turnId: number;
   readonly origin: PromptOrigin;
   readonly prompt?: string;
+  /** The prompt record id when the turn was opened by a prompt submission. */
+  readonly promptId?: string;
 }
 
 export interface TurnEndedEvent {
@@ -1042,8 +1061,18 @@ export const permissionModeSchema = z.enum(['manual', 'yolo', 'auto']) satisfies
 
 export const skillSourceSchema = z.enum(['project', 'user', 'extra', 'builtin']) satisfies z.ZodType<SkillSource>;
 
+export const bundledSkillActivationSchema = z.object({
+  activationId: z.string(),
+  skillName: z.string(),
+  skillArgs: z.string().optional(),
+  skillType: z.string().optional(),
+  skillPath: z.string().optional(),
+  skillSource: skillSourceSchema.optional(),
+}) satisfies z.ZodType<BundledSkillActivation>;
+
 export const userPromptOriginSchema = z.object({
   kind: z.literal('user'),
+  skillActivations: z.array(bundledSkillActivationSchema).optional(),
 }) satisfies z.ZodType<UserPromptOrigin>;
 
 export const skillActivationOriginSchema = z.object({
@@ -1288,6 +1317,7 @@ export const kimiErrorCodeSchema = z.enum([
   'request.invalid',
   'request.work_dir_required',
   'request.prompt_input_empty',
+  'prompt.id_conflict',
   'prompt.not_found',
   'prompt.already_completed',
   'session.busy',
@@ -1604,6 +1634,7 @@ export const turnStartedEventSchema = z.object({
   turnId: z.number(),
   origin: promptOriginSchema,
   prompt: z.string().optional(),
+  promptId: z.string().optional(),
 }) satisfies z.ZodType<TurnStartedEvent>;
 
 export const turnEndedEventSchema = z.object({
