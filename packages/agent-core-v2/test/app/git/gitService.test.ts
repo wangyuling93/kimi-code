@@ -1,14 +1,3 @@
-/**
- * Scenario: GitService status / diff / findWorkTree against a real temp repo.
- * Responsibility: porcelain + numstat + work-tree discovery, and folding
- *   `gh pr view` into status().
- * Wiring: real HostProcessService + HostFileSystem for git/fs. `gh` is stubbed
- *   on the workspace runtime process (the spawn path GitService uses) — CI
- *   images ship `gh`, and the first `pr view` can sit until GitService's 5s
- *   spawn timeout, racing vitest's 5s default.
- * Run: pnpm --filter @moonshot-ai/agent-core-v2 test -- test/app/git/gitService.test.ts
- */
-
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
