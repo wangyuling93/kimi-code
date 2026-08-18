@@ -1,5 +1,19 @@
 # @moonshot-ai/kimi-code
 
+## 0.37.1
+
+### Patch Changes
+
+- Hide the /tower slash command; the tower feature is now disabled.
+
+- [#2914](https://github.com/MoonshotAI/kimi-code/pull/2914) [`1cf617d`](https://github.com/wangyuling93/kimi-code/commit/1cf617d769a887f5d8306ebc16a1e078b5e47049) Thanks [@SeleneXX](https://github.com/SeleneXX)! - Fix Gemini tool-calling sessions failing on follow-up requests.
+
+- [#2985](https://github.com/MoonshotAI/kimi-code/pull/2985) [`a7dc1ea`](https://github.com/wangyuling93/kimi-code/commit/a7dc1ea28445555d5944066936fdf6e1b21d27ea) Thanks [@bj456736](https://github.com/bj456736)! - Fix a startup error when a restored session references a model that is no longer configured.
+
+- [#3016](https://github.com/MoonshotAI/kimi-code/pull/3016) [`98ebda8`](https://github.com/wangyuling93/kimi-code/commit/98ebda840a1e420f57a05ec680cbeca41a2419d7) Thanks [@sailist](https://github.com/sailist)! - Fix /undo not restoring the todo list to its state before the undone turn.
+
+- [#2989](https://github.com/MoonshotAI/kimi-code/pull/2989) [`09976b0`](https://github.com/wangyuling93/kimi-code/commit/09976b09140c412f81a38cc00191f88bee4a9437) Thanks [@bj456736](https://github.com/bj456736)! - Add `kimi web --web-title <title>` to set a custom browser tab title for the web UI.
+
 ## 0.37.0
 
 ### Minor Changes
